@@ -230,12 +230,14 @@ class CachedRAGPipeline:
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _cache_key(query: str, top_k: int, collection: str) -> str:
-    raw = f"{collection}::{top_k}::{query.strip().lower()}"
-    return hashlib.sha256(raw.encode()).hexdigest()
-
-
 def _collection_prefix(collection_name: str) -> str:
-    # All keys for a collection share the same hash prefix (first 8 chars of
-    # the collection-only hash), used for bulk invalidation.
+    """8-char prefix shared by every cache key for this collection."""
     return hashlib.sha256(collection_name.encode()).hexdigest()[:8]
+
+
+def _cache_key(query: str, top_k: int, collection: str) -> str:
+    # Key = collection_prefix + hash(topk::query)
+    # This ensures key.startswith(collection_prefix) for bulk invalidation.
+    prefix = _collection_prefix(collection)
+    rest = hashlib.sha256(f"{top_k}::{query.strip().lower()}".encode()).hexdigest()
+    return f"{prefix}{rest}"
