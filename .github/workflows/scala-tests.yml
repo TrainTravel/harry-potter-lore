@@ -1,0 +1,66 @@
+name: Scala Tests
+
+on:
+  push:
+    branches: ["main", "claude/**", "feature/**"]
+    paths:
+      - "scala-harness/**"
+      - ".github/workflows/scala-tests.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "scala-harness/**"
+
+jobs:
+  test:
+    name: sbt test (Java ${{ matrix.java }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ["17", "21"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+
+      # Cache the sbt launcher, Coursier resolution cache, and compiled classes.
+      # Without this, dependency resolution alone takes 3-5 minutes on every run.
+      - name: Cache sbt and Coursier
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.sbt
+            ~/.cache/coursier
+            scala-harness/target
+            scala-harness/project/target
+            scala-harness/project/project/target
+          key: sbt-${{ matrix.java }}-${{ hashFiles('scala-harness/build.sbt', 'scala-harness/project/plugins.sbt') }}
+          restore-keys: sbt-${{ matrix.java }}-
+
+      - name: Install sbt
+        run: |
+          curl -fL "https://github.com/sbt/sbt/releases/download/v1.10.6/sbt-1.10.6.tgz" | tar xz -C /usr/local
+          echo "/usr/local/sbt/bin" >> $GITHUB_PATH
+
+      - name: Run tests
+        working-directory: scala-harness
+        run: sbt "testOnly *Suite" --batch
+        env:
+          # Keep sbt memory usage predictable in CI
+          SBT_OPTS: "-Xmx2G -Xss4M"
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbt-test-results-java${{ matrix.java }}
+          path: scala-harness/target/test-reports/
+          retention-days: 7
