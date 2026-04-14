@@ -20,15 +20,32 @@ object Main extends IOApp:
     given logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
     for
-      _      <- logger.info("deepTutor context harness starting...")
+      _           <- logger.info("deepTutor context harness starting...")
 
-      // Build the vector store (in-memory; swap for chromadb() in production)
-      store  <- VectorStoreAlgebra.inMemory
+      // ── Fix #6: validate index version before accepting any queries ──────
+      versionGuard = IndexVersionGuardAlgebra.fileSystem(
+                       manifestPath    = "data/knowledge_bases/hp_lore/index_manifest.json",
+                       embeddingModel  = "sentence-transformers/all-MiniLM-L6-v2",
+                       embeddingDim    = 384,
+                       collectionName  = "hp_lore",
+                     )
+      manifest    <- versionGuard.ensure
+      _           <- logger.info(s"Index manifest OK: model=${manifest.embeddingModel}, dim=${manifest.embeddingDim}")
+
+      // ── Fix #7: wrap the vector store with a retrieval cache ─────────────
+      rawStore    <- VectorStoreAlgebra.inMemory
+      cache       <- RetrievalCacheAlgebra.inMemory(maxSize = 512, ttlSeconds = 300.0)
+      store        = CachedVectorStore(rawStore, cache, "hp_lore")
+
+      // ── Fix #5: start cost tracker ────────────────────────────────────────
+      costTracker <- CostTrackerAlgebra.inMemory
 
       // Seed with a few HP lore snippets so the server is queryable immediately
-      _      <- seedLore(store)
+      _           <- seedLore(store)
+      chunkCount  <- store.count
+      _           <- versionGuard.updateStats(docCount = 3, chunkCount = chunkCount)
 
-      routes  = LoreRoutes(store).routes
+      routes  = LoreRoutes(store, costTracker).routes
       httpApp = HttpLogger.httpApp(logHeaders = true, logBody = false)(
                   CORS.policy.withAllowOriginAll(routes.orNotFound)
                 )

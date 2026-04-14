@@ -17,7 +17,7 @@ import fs2.Stream
 // Context Engineering insight: the HTTP layer is *thin*.  It decodes requests,
 // delegates to the pipeline, and encodes responses.  No business logic lives here.
 
-class LoreRoutes(store: VectorStoreAlgebra[IO])(using logger: Logger[IO]):
+class LoreRoutes(store: VectorStoreAlgebra[IO], costTracker: CostTrackerAlgebra[IO] = null)(using logger: Logger[IO]):
 
   // Per-request window factory (in production: session-keyed map)
   private def freshWindow: IO[ContextWindowAlgebra[IO]] =
@@ -71,13 +71,30 @@ class LoreRoutes(store: VectorStoreAlgebra[IO])(using logger: Logger[IO]):
       yield resp
 
     // -------------------------------------------------------------------------
-    // GET /health
+    // GET /health  — includes cache stats and cost summary
     // -------------------------------------------------------------------------
     case GET -> Root / "health" =>
       for
-        n    <- store.count
-        resp <- Ok(Map("status" -> "ok", "chunks" -> n.toString).asJson)
+        n         <- store.count
+        cacheStats = store match
+                       case c: CachedVectorStore => Some(c.cacheStats)
+                       case _                    => None
+        cacheJson <- cacheStats.fold(IO.pure(Map.empty[String, String]))(_.map(s =>
+                       Map("cache_hit_rate" -> f"${s.hitRate}%.3f", "cache_size" -> s.size.toString)
+                     ))
+        costJson  <- Option(costTracker).fold(IO.pure(Map.empty[String, String]))(t =>
+                       t.summary.map(s => Map("total_cost_usd" -> f"${s.totalCostUsd}%.6f", "llm_calls" -> s.totalEvents.toString))
+                     )
+        resp      <- Ok((Map("status" -> "ok", "chunks" -> n.toString) ++ cacheJson ++ costJson).asJson)
       yield resp
+
+    // -------------------------------------------------------------------------
+    // GET /cost  — cost aggregation report
+    // -------------------------------------------------------------------------
+    case GET -> Root / "cost" =>
+      Option(costTracker) match
+        case None    => Ok(Map("error" -> "cost tracker not configured").asJson)
+        case Some(t) => t.summary.flatMap(s => Ok(s.asJson))
   }
 
   // ---------------------------------------------------------------------------

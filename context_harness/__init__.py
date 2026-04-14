@@ -10,7 +10,15 @@ from .rag_pipeline import RAGPipeline, Chunk, ChunkingStrategy
 from .context_assembler import ContextAssembler, AssemblyStrategy
 from .prompt_templates import PromptTemplate, SystemPrompt, LorePrompt
 
+# deepTutor weakness fixes
+from .summarizer import SummarizationQueue, SummarizingContextWindow, SummaryStore
+from .document_registry import DocumentRegistry, UpsertResult
+from .cost_tracker import CostTracker, CostEvent, CostStore, track_cost, estimate_cost_usd
+from .index_version_guard import IndexVersionGuard, IndexManifest, IndexVersionError
+from .retrieval_cache import RetrievalCache, CachedRAGPipeline
+
 __all__ = [
+    # Core
     "ContextWindow",
     "ContextEntry",
     "ContextRole",
@@ -22,4 +30,20 @@ __all__ = [
     "PromptTemplate",
     "SystemPrompt",
     "LorePrompt",
+    # Weakness fixes
+    "SummarizationQueue",
+    "SummarizingContextWindow",
+    "SummaryStore",
+    "DocumentRegistry",
+    "UpsertResult",
+    "CostTracker",
+    "CostEvent",
+    "CostStore",
+    "track_cost",
+    "estimate_cost_usd",
+    "IndexVersionGuard",
+    "IndexManifest",
+    "IndexVersionError",
+    "RetrievalCache",
+    "CachedRAGPipeline",
 ]
