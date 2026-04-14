@@ -131,12 +131,13 @@ class RAGPipeline:
     def _init_chromadb(self, model_name: str) -> None:
         try:
             import chromadb
-            from chromadb.utils import embedding_functions as ef_module
+            from chromadb import Settings
+            from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
 
-            self._client = chromadb.Client()
-            self._ef = ef_module.SentenceTransformerEmbeddingFunction(
-                model_name=model_name
+            self._client = chromadb.EphemeralClient(
+                settings=Settings(anonymized_telemetry=False)
             )
+            self._ef = DefaultEmbeddingFunction()
             self._collection = self._client.get_or_create_collection(
                 name=self.collection_name,
                 embedding_function=self._ef,
