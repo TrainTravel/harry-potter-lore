@@ -1,0 +1,66 @@
+name: Python Tests
+
+on:
+  push:
+    branches: ["main", "claude/**", "feature/**"]
+    paths:
+      - "context_harness/**"
+      - "tests/**"
+      - "pytest.ini"
+      - "requirements.txt"
+      - ".github/workflows/python-tests.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "context_harness/**"
+      - "tests/**"
+      - "pytest.ini"
+      - "requirements.txt"
+
+jobs:
+  test:
+    name: pytest (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ matrix.python-version }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: pip-${{ matrix.python-version }}-
+
+      # Install only what the tests actually need.
+      # The full requirements.txt pulls in GPU/binary wheels (onnxruntime,
+      # chromadb HNSWLIB) that are slow or unavailable in CI.
+      # The test suite uses in-memory backends exclusively, so we only
+      # need pytest and pytest-asyncio.
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio
+
+      - name: Run tests
+        run: python -m pytest tests/ -v --tb=short
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-results-${{ matrix.python-version }}
+          path: |
+            .pytest_cache/
+          retention-days: 7
