@@ -30,7 +30,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Callable, Coroutine, List, Optional
 
-from .rag_pipeline import Chunk, RAGPipeline
+from .rag_pipeline import Chunk, ScoredChunk, RAGPipeline
 
 
 # ---------------------------------------------------------------------------
@@ -39,7 +39,7 @@ from .rag_pipeline import Chunk, RAGPipeline
 
 @dataclass
 class CacheEntry:
-    chunks: List[Chunk]
+    chunks: List[ScoredChunk]
     created_at: float = field(default_factory=time.monotonic)
     hit_count: int = 0
 
@@ -82,7 +82,7 @@ class RetrievalCache:
     # Retrieve (cached)
     # ------------------------------------------------------------------
 
-    async def retrieve(self, query: str, top_k: int = 5) -> List[Chunk]:
+    async def retrieve(self, query: str, top_k: int = 5) -> List[ScoredChunk]:
         """
         Return cached chunks if available and fresh; otherwise call the pipeline
         and cache the result.
@@ -209,7 +209,7 @@ class CachedRAGPipeline:
         self._pipeline = pipeline
         self._cache = RetrievalCache(pipeline, max_size=max_size, ttl_seconds=ttl_seconds)
 
-    async def retrieve(self, query: str, top_k: int = 5) -> List[Chunk]:
+    async def retrieve(self, query: str, top_k: int = 5) -> List[ScoredChunk]:
         return await self._cache.retrieve(query, top_k)
 
     def ingest(self, doc_id: str, text: str, **metadata) -> List[Chunk]:

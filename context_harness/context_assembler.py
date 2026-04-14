@@ -17,7 +17,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import List, Optional
 
-from .rag_pipeline import Chunk
+from .rag_pipeline import ScoredChunk
 
 
 # ---------------------------------------------------------------------------
@@ -62,7 +62,7 @@ class ContextAssembler:
 
     def assemble(
         self,
-        chunks: List[Chunk],
+        chunks: List[ScoredChunk],
         query: Optional[str] = None,
         preamble: str = "Relevant knowledge from the Harry Potter lore:",
     ) -> str:
@@ -79,7 +79,7 @@ class ContextAssembler:
 
     def assemble_as_messages(
         self,
-        chunks: List[Chunk],
+        chunks: List[ScoredChunk],
         query: Optional[str] = None,
     ) -> List[dict]:
         """Return a list of message dicts suitable for the context window."""
@@ -92,11 +92,11 @@ class ContextAssembler:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _filter(self, chunks: List[Chunk]) -> List[Chunk]:
+    def _filter(self, chunks: List[ScoredChunk]) -> List[ScoredChunk]:
         return [c for c in chunks if c.score >= self.min_score][: self.max_chunks]
 
-    def _dedup(self, chunks: List[Chunk]) -> List[Chunk]:
-        kept: List[Chunk] = []
+    def _dedup(self, chunks: List[ScoredChunk]) -> List[ScoredChunk]:
+        kept: List[ScoredChunk] = []
         for candidate in chunks:
             duplicate = False
             for existing in kept:
@@ -107,7 +107,7 @@ class ContextAssembler:
                 kept.append(candidate)
         return kept
 
-    def _order(self, chunks: List[Chunk]) -> List[Chunk]:
+    def _order(self, chunks: List[ScoredChunk]) -> List[ScoredChunk]:
         if self.strategy in (AssemblyStrategy.RELEVANCE, AssemblyStrategy.SANDWICH):
             return sorted(chunks, key=lambda c: c.score, reverse=True)
         return chunks   # NAIVE / CITATION keep retrieval order
@@ -117,7 +117,7 @@ class ContextAssembler:
 # Formatters
 # ---------------------------------------------------------------------------
 
-def _format_naive(chunks: List[Chunk], preamble: str, _query) -> str:
+def _format_naive(chunks: List[ScoredChunk], preamble: str, _query) -> str:
     parts = [preamble, ""]
     for chunk in chunks:
         parts.append(chunk.text)
@@ -125,7 +125,7 @@ def _format_naive(chunks: List[Chunk], preamble: str, _query) -> str:
     return "\n".join(parts).strip()
 
 
-def _format_relevance(chunks: List[Chunk], preamble: str, _query) -> str:
+def _format_relevance(chunks: List[ScoredChunk], preamble: str, _query) -> str:
     parts = [preamble, ""]
     for i, chunk in enumerate(chunks, 1):
         parts.append(f"[{i}] (score={chunk.score:.2f}) {chunk.text}")
@@ -133,7 +133,7 @@ def _format_relevance(chunks: List[Chunk], preamble: str, _query) -> str:
     return "\n".join(parts).strip()
 
 
-def _format_sandwich(chunks: List[Chunk], preamble: str, _query) -> str:
+def _format_sandwich(chunks: List[ScoredChunk], preamble: str, _query) -> str:
     """
     Sandwich strategy: put the *most* relevant chunk both first and last.
     This exploits LLM primacy + recency bias to emphasise the best evidence.
@@ -151,7 +151,7 @@ def _format_sandwich(chunks: List[Chunk], preamble: str, _query) -> str:
     return "\n".join(parts).strip()
 
 
-def _format_citation(chunks: List[Chunk], preamble: str, _query) -> str:
+def _format_citation(chunks: List[ScoredChunk], preamble: str, _query) -> str:
     """
     Numbered citation format so the LLM can reference sources explicitly.
     The model is instructed (in the system prompt) to cite [N] inline.
