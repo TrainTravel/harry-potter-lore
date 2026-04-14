@@ -329,11 +329,255 @@ or capability pipeline model.
 
 ---
 
-## What to build next
+## What to build next (after Session 5)
 
-- [ ] `UnifiedContext` dataclass + `ContextBuilder` assembly lifecycle
-- [ ] SQLite session/message/turn persistence (`TurnRuntimeManager`)
-- [ ] Memory context — cross-session user profile store
-- [ ] Wire everything into a single end-to-end turn handler
+- [ ] `UnifiedContext` dataclass + `ContextBuilder` assembly lifecycle ← done in Session 6
+- [ ] SQLite session/message/turn persistence (`TurnRuntimeManager`) ← done in Session 6
+- [ ] Wire everything into a single end-to-end turn handler ← done in Session 6
 - [ ] Notebook (`lore_agent.ipynb`) — demonstrate the full pipeline interactively
 - [ ] Scala: `munit-cats-effect` tests for `CostTracker`, `RetrievalCache`, `IndexVersionGuard`
+
+---
+
+## Session 6 — IBM Agent Engineering: seven skills mapped to code
+
+**Branch:** `claude/agent-engineering-skills`
+
+### Context
+
+An IBM Technology video argued that "prompt engineer" is evolving into "agent
+engineer" — a systems engineering discipline, not a text-writing one. It
+identified seven concrete skills required to ship production agents. We mapped
+each skill to a gap in the existing codebase and implemented the missing pieces.
+
+---
+
+### Skill 1 — System Design → `unified_context.py`
+
+**Gap:** The previous session identified this explicitly: we had all the
+sub-systems (RAG, window, summarizer, cost tracker) but no orchestration
+layer to tie them together for a single turn.
+
+**What we built:**
+
+`UnifiedContext` is the per-turn request envelope that deepTutor describes.
+It carries every context slot — `history_context`, `summary_context`,
+`retrieval_context`, `memory_context` — as named fields. It is ephemeral:
+assembled before the turn starts, never stored. Durability comes from
+persisting messages before assembly and turn status after completion.
+
+```
+UnifiedContext
+  ├── session_id / turn_id
+  ├── user_message
+  ├── history_context    ← verbatim recent turns from SQLite
+  ├── summary_context    ← LLM-compressed older turns
+  ├── retrieval_context  ← RAG chunks assembled by ContextAssembler
+  └── memory_context     ← cross-session user profile
+```
+
+`ContextBuilder.build()` fetches history from SQLite and runs retrieval
+**concurrently** via `asyncio.gather()` — not sequentially. The assembled
+slots are returned as a single `UnifiedContext` object.
+
+`SessionStore` is a minimal SQLite layer for `sessions`, `messages`, and
+`turns` tables. The design principle: sessions and messages are appended
+before the turn runs; turn status is updated after it completes or fails.
+
+`TurnRuntimeManager` is an async context manager (`async with`) that opens
+a turn row on entry and closes it (completed/failed/escalated) on exit —
+even if an exception is raised.
+
+---
+
+### Skill 2 — Tool and Contract Design → `tool_registry.py`
+
+**Gap:** The agent had no formal interface between the LLM and external
+tools. Vague function signatures let the LLM guess at parameter names and
+types, producing silent runtime failures.
+
+**What we built:**
+
+`ToolSchema` declares a tool's complete contract: input properties with
+types, required/optional status, allowed values (`enum`), numeric bounds
+(`minimum`/`maximum`), and regex patterns. The schema is the single source
+of truth for both the validator and the LLM's function-calling payload.
+
+`SchemaValidator` enforces the contract before every tool call:
+- Missing required fields → `ToolContractError`
+- Wrong type → `ToolContractError`
+- Unknown field → `ToolContractError` (strict — no extra keys allowed)
+- Constraint violation (min/max/enum/pattern) → `ToolContractError`
+
+The registry produces OpenAI-compatible `function_calling` schemas via
+`to_openai_functions()`, so the LLM sees exactly the same contract as
+the validator enforces. "A tool contract is a promise — break it loudly."
+
+`ToolRegistry.call_log()` records every tool invocation with latency,
+giving a built-in audit trail without a separate logger.
+
+---
+
+### Skill 4 — Reliability Engineering → `reliability.py`
+
+**Gap:** Every call to an external LLM API was fire-and-forget with no
+retry logic, no timeout, and no circuit breaker. The first transient API
+failure would propagate directly to the user.
+
+**What we built:**
+
+`RetryPolicy` — exponential backoff with full jitter. Jitter is critical:
+without it, all agents retry at the same moment after a shared outage
+(thundering herd). The `retrying(predicate)` method retries only on
+exceptions matching a caller-supplied predicate — non-retryable errors
+propagate immediately. `max_attempts=4`, `base_delay=1s`, `max_delay=30s`
+by default.
+
+`CircuitBreaker` — closed / open / half-open state machine. Once
+`failure_threshold` failures accumulate, the circuit opens and subsequent
+calls fail immediately (`CircuitOpenError`) without waiting for a timeout.
+After `recovery_timeout` seconds the circuit enters half-open and allows
+one probe request. Two consecutive successes close the circuit again.
+
+`with_timeout` — wraps any async call with `asyncio.wait_for`.
+
+`with_fallback` — tries primary, catches specified exceptions, runs
+fallback. Used for: return cached answer when RAG is down, return degraded
+response when LLM times out.
+
+`ResilientCaller` — composes all three in one object. This is what every
+LLM and API call should be wrapped with in production.
+
+A **bug was found** during this implementation: `retrying` was initially
+written as `async def`, which made `policy.retrying(pred)` return a
+coroutine rather than a callable. The test caught this — fixed by making
+`retrying` a sync method that returns an async executor.
+
+---
+
+### Skill 5 — Security and Safety → `security.py`
+
+**Gap:** No protection against prompt injection, no input validation,
+no output filtering. The agent would pass any user string directly to
+the LLM and return any LLM response directly to the user.
+
+**What we built:**
+
+`PromptGuard` — scans input for 9 injection signatures (role override,
+prompt extraction, jailbreak keywords, context escape sequences). Each
+pattern has a `ThreatLevel`: WARN (suspicious) or BLOCK (definite).
+BLOCK raises immediately; WARN records but continues. All patterns are
+case-insensitive.
+
+`InputValidator` — structural checks before any LLM call:
+- Length bounds (min/max characters)
+- Optional character allowlist (regex)
+- Configurable blocked patterns (SQL injection, XSS, etc.)
+
+`OutputFilter` — scans LLM responses for PII (SSN, credit card patterns),
+credential leakage (`api_key=...`), and harmful content. Returns a safe
+fallback string instead of the raw LLM output when a violation is found.
+
+`PermissionBoundary` — capability-to-tool access control list. Each
+capability declares which tools it may call. Attempting to call an
+unpermitted tool raises `PermissionDeniedError` immediately. Prevents
+a compromised capability from calling tools outside its scope.
+
+`SecurityPipeline` — composes guard, validator, and filter into one
+`check_input()` / `check_output()` call pair around each LLM interaction.
+
+---
+
+### Skill 6 — Evaluation and Observability → `tracer.py`
+
+**Gap:** The `CostTracker` recorded token costs but not the sequence of
+decisions the agent made. When something went wrong there was no way to
+trace backward through what happened.
+
+**What we built:**
+
+`Tracer` — assigns a monotonically increasing sequence number to every
+event in a turn: `TURN_START`, `LLM_CALL`, `TOOL_CALL`, `TOOL_RESULT`,
+`RETRIEVAL`, `CONTEXT_BUILT`, `ESCALATION`, `ERROR`. The `dump()` method
+produces a human-readable trace table — this is the "trace backward"
+workflow the IBM video describes.
+
+`TraceStore` — persists events to SQLite via a background `asyncio.create_task`
+(fire-and-forget, never blocks the turn). `get_turn(turn_id)` replays the
+full event sequence for post-hoc debugging.
+
+`EvalMetrics` — data-driven metrics aggregation:
+- Success rate (fraction of turns with `success=True`)
+- p50 and p95 latency
+- Average cost per task
+- All metrics broken down by capability
+
+"Move away from guessing — use data-driven metrics." The `by_capability()`
+breakdown directly answers: which capability is most expensive? Which has
+the worst success rate?
+
+---
+
+### Skill 7 — Product Thinking → `unified_context.py` (EscalationPolicy)
+
+**Gap:** The agent had no concept of when to stop answering and hand off
+to a human. An agent that confidently returns wrong answers is worse than
+one that escalates appropriately.
+
+**What we built:**
+
+`EscalationPolicy` evaluates four rules in order:
+1. Unrecoverable error type (`AuthenticationError`, `RateLimitError`) → escalate
+2. User explicitly asked for a human ("speak to a human", "real person") → escalate
+3. Retrieval context is empty for a knowledge question → escalate
+4. Default → continue
+
+`TurnRuntimeManager.should_escalate()` surfaces this policy at the turn
+boundary. When `should_escalate()` returns True, the turn closes with
+`status=ESCALATED` and the user receives `escalation_message()` rather
+than a hallucinated answer.
+
+---
+
+### Scala additions
+
+`ResilienceAlgebra.scala` — `RetryPolicy` using `IO.sleep`, `CircuitBreakerAlgebra`
+(tagless-final) with `Ref`-based state machine, `ResilientCaller` composing
+retry + circuit breaker + `IO.race`-based timeout.
+
+`TracerAlgebra.scala` — `TracerAlgebra` (tagless-final) with sequence-numbered
+`TraceEvent` recording, `dump` for human-readable output, and `timed[A]`
+that measures latency and records a `TraceEvent` automatically.
+`EvalMetricsAlgebra` with `Ref`-based accumulation and p50/p95 latency.
+
+---
+
+### Test results
+
+180 Python tests, all passing (1.27s). **2 bugs found by the test suite:**
+
+1. `RetryPolicy.retrying` was `async def`, making `policy.retrying(pred)`
+   return a coroutine instead of a callable — tests caught the `TypeError`.
+   Fixed by making `retrying` a sync method returning an async executor.
+
+2. The `retrying` call pattern in tests was updated from
+   `await policy.retrying(pred)(fn)` → `policy.retrying(pred)` returns the
+   executor, which is then called as `await executor(fn)`.
+
+---
+
+## Commit history (branch: `claude/agent-engineering-skills`)
+
+| Commit | Description |
+|---|---|
+| TBD | Seven IBM agent engineering skills implemented |
+
+---
+
+## What to build next
+
+- [ ] Notebook (`lore_agent.ipynb`) — end-to-end demo wiring all components
+- [ ] `MemoryStore` — cross-session user profile persistence
+- [ ] Wire `SecurityPipeline` + `Tracer` + `ResilientCaller` into `TurnRuntimeManager`
+- [ ] Scala tests for `ResilienceAlgebra` and `TracerAlgebra`
+- [ ] HTTP endpoints for trace replay (`GET /trace/{turn_id}`) and eval metrics (`GET /eval`)
