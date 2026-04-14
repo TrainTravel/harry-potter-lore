@@ -120,7 +120,7 @@ class DocumentRegistry:
             action = "created"
 
         # Ingest fresh chunks
-        chunks = self._pipeline.ingest(doc_id, text, embedding_model=self._embedding_model, **metadata)
+        chunks = self._pipeline.ingest(text, doc_id, embedding_model=self._embedding_model, **metadata)
         chunk_ids = [c.chunk_id for c in chunks]
 
         record = DocRecord(
