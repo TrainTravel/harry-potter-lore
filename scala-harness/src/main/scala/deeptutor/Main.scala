@@ -1,6 +1,7 @@
 package deeptutor
 
 import cats.effect.{ExitCode, IO, IOApp}
+import cats.syntax.all.*
 import com.comcast.ip4s.*
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.server.middleware.{Logger as HttpLogger, CORS}

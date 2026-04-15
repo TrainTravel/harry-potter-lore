@@ -7,7 +7,6 @@ import org.http4s.*
 import org.http4s.circe.*
 import org.http4s.circe.CirceEntityDecoder.*
 import org.http4s.dsl.io.*
-import org.http4s.server.middleware.QueryParamDecoder
 import org.typelevel.log4cats.Logger
 import java.util.UUID
 import fs2.Stream

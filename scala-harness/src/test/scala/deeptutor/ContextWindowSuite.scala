@@ -22,9 +22,11 @@ class ContextWindowSuite extends CatsEffectSuite:
       assert(used > 0, "used tokens should be positive")
 
   test("evicts lowest-priority non-system entry when budget exceeded"):
-    // budget = 50 tokens
+    // whitespace counter = 1 token per word. System=2, User=5, Retrieval=12.
+    // budget = 20 - 5 = 15; after System+User (7 used) adding Retrieval (12)
+    // forces the User entry to be evicted.
     for
-      window <- ContextWindowAlgebra.inMemory(maxTokens = 60, reservedOutput = 10)
+      window <- ContextWindowAlgebra.inMemory(maxTokens = 20, reservedOutput = 5)
       // system entries are pinned (never evicted)
       _      <- window.addText(ContextRole.System, "System prompt", priority = 10.0)
       // low-priority user entry (will be evicted)

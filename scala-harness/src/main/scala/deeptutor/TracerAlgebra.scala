@@ -150,7 +150,7 @@ object EvalMetricsAlgebra:
             )
         }
 
-      private def percentile(sorted: List[Double], p: Int): Double =
-        if sorted.isEmpty then 0.0
-        else sorted(math.min((sorted.size * p / 100), sorted.size - 1))
+        private def percentile(sorted: List[Double], p: Int): Double =
+          if sorted.isEmpty then 0.0
+          else sorted(math.min((sorted.size * p / 100), sorted.size - 1))
     }

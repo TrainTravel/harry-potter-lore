@@ -87,7 +87,7 @@ object IndexVersionGuardAlgebra:
       def validate: IO[IndexManifest] =
         for
           raw      <- IO(Files.readString(path))
-          manifest <- IO.fromEither(decode[IndexManifest](raw).left.map(e => new RuntimeException(e.message)))
+          manifest <- IO.fromEither(decode[IndexManifest](raw).left.map(e => new RuntimeException(e.getMessage)))
           _        <- checkSchema(manifest)
           _        <- checkModel(manifest)
           _        <- checkDim(manifest)
@@ -97,7 +97,7 @@ object IndexVersionGuardAlgebra:
       def updateStats(docCount: Int, chunkCount: Int): IO[Unit] =
         for
           raw      <- IO(Files.readString(path))
-          manifest <- IO.fromEither(decode[IndexManifest](raw).left.map(e => new RuntimeException(e.message)))
+          manifest <- IO.fromEither(decode[IndexManifest](raw).left.map(e => new RuntimeException(e.getMessage)))
           updated   = manifest.copy(
                         docCount   = docCount,
                         chunkCount = chunkCount,
