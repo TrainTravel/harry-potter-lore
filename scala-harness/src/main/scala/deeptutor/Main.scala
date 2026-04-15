@@ -69,37 +69,61 @@ object Main extends IOApp:
   // Seed data — minimal HP lore for demo purposes
   // ---------------------------------------------------------------------------
 
+  // ---------------------------------------------------------------------------
+  // Seed data — built with the IngestionPipeline DSL
+  // ---------------------------------------------------------------------------
+  // Each document is tagged with its phantom SourceKind at the call site.
+  // The compiler summons the right Chunkable[S] instance, which determines
+  // the chunking strategy.  No runtime match or dictionary lookup.
+  //
+  // To add a new universe or source type: add a Document[S] line.
+
   private def seedLore(store: VectorStoreAlgebra[IO]): IO[Unit] =
-    val docs = List(
-      ("hp-philosopher-stone",
-       """Albus Dumbledore was the headmaster of Hogwarts School of Witchcraft and Wizardry.
-         |He was widely considered the greatest wizard of his age, and was the only one
-         |Voldemort ever feared. Dumbledore wielded the Elder Wand, the most powerful wand
-         |ever made, and was the master of all three Deathly Hallows at one point.
-         |
-         |The Philosopher's Stone was a legendary alchemical substance said to be capable
-         |of turning any metal into gold. It also produced the Elixir of Life, which made
-         |the drinker immortal. Nicolas Flamel was its only known maker.""".stripMargin),
+    val plan = IngestionPipeline.empty
 
-      ("hp-chamber-of-secrets",
-       """The Chamber of Secrets was a hidden chamber deep beneath Hogwarts, built by
-         |Salazar Slytherin. It housed a Basilisk — a giant serpent whose gaze is fatal
-         |to those who look it directly in the eye. The entrance was concealed behind a
-         |sink in Moaning Myrtle's bathroom on the second floor.
-         |
-         |Tom Riddle opened the Chamber in his fifth year, fifty years before Harry's second
-         |year at Hogwarts. The Basilisk was controlled by the Heir of Slytherin.""".stripMargin),
+      // ── Harry Potter — fictional canon, recursive chunker ────────────────
+      .add(Document[FictionalCanon](
+        docId    = "hp-philosopher-stone",
+        universe = "hp",
+        text     =
+          """Albus Dumbledore was the headmaster of Hogwarts School of Witchcraft and Wizardry.
+            |He was widely considered the greatest wizard of his age, and was the only one
+            |Voldemort ever feared. Dumbledore wielded the Elder Wand, the most powerful wand
+            |ever made, and was the master of all three Deathly Hallows at one point.
+            |
+            |The Philosopher's Stone was a legendary alchemical substance said to be capable
+            |of turning any metal into gold. It also produced the Elixir of Life, which made
+            |the drinker immortal. Nicolas Flamel was its only known maker.""".stripMargin,
+      ))
 
-      ("hp-deathly-hallows",
-       """The Deathly Hallows are three magical objects created by Death (or, more plausibly,
-         |by the three Peverell brothers): the Elder Wand, the Resurrection Stone, and the
-         |Invisibility Cloak. Together they make the owner the Master of Death.
-         |
-         |Harry Potter became the true master of the Elder Wand without wielding it, by
-         |disarming Draco Malfoy who had unknowingly won its allegiance from Dumbledore.
-         |Harry chose to snap the Elder Wand after defeating Voldemort.""".stripMargin),
-    )
+      .add(Document[FictionalCanon](
+        docId    = "hp-chamber-of-secrets",
+        universe = "hp",
+        text     =
+          """The Chamber of Secrets was a hidden chamber deep beneath Hogwarts, built by
+            |Salazar Slytherin. It housed a Basilisk — a giant serpent whose gaze is fatal
+            |to those who look it directly in the eye. The entrance was concealed behind a
+            |sink in Moaning Myrtle's bathroom on the second floor.
+            |
+            |Tom Riddle opened the Chamber in his fifth year, fifty years before Harry's second
+            |year at Hogwarts. The Basilisk was controlled by the Heir of Slytherin.""".stripMargin,
+      ))
 
-    docs.traverse_ { case (docId, text) =>
-      store.ingest(docId, text, Map("source" -> "HP canon")).void
+      .add(Document[FictionalCanon](
+        docId    = "hp-deathly-hallows",
+        universe = "hp",
+        text     =
+          """The Deathly Hallows are three magical objects created by Death (or, more plausibly,
+            |by the three Peverell brothers): the Elder Wand, the Resurrection Stone, and the
+            |Invisibility Cloak. Together they make the owner the Master of Death.
+            |
+            |Harry Potter became the true master of the Elder Wand without wielding it, by
+            |disarming Draco Malfoy who had unknowingly won its allegiance from Dumbledore.
+            |Harry chose to snap the Elder Wand after defeating Voldemort.""".stripMargin,
+      ))
+
+    plan.run(store).flatMap { results =>
+      results.traverse_(r =>
+        logger.info(s"Seeded doc=${r.docId} chunks=${r.chunkCount} strategy=${r.strategy}")
+      )
     }
