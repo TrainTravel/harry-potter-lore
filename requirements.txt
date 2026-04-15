@@ -63,7 +63,7 @@ nest-asyncio==1.6.0
 numpy==1.26.4
 oauthlib==3.3.1
 openai==2.30.0
-onnxruntime==1.16.3
+onnxruntime>=1.17.0
 opentelemetry-api==1.33.1
 opentelemetry-exporter-otlp-proto-common==1.33.1
 opentelemetry-exporter-otlp-proto-grpc==1.33.1
@@ -78,7 +78,7 @@ optuna==4.8.0
 orjson==3.10.15
 overrides==7.7.0
 packaging==26.0
-pandas==2.0.3
+pandas>=2.2.0
 parso==0.8.6
 pexpect==4.9.0
 pickleshare==0.7.5
@@ -116,7 +116,7 @@ tornado==6.4.2
 tqdm==4.67.3
 traitlets==5.14.3
 typer==0.20.1
-typing-extensions==4.13.2
+typing-extensions>=4.14.1
 tzdata==2026.1
 urllib3==2.2.3
 uvicorn==0.33.0
