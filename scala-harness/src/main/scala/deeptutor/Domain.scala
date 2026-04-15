@@ -76,7 +76,7 @@ final case class IngestResponse(
 // Error model — typed errors keep the effect layer honest
 // ---------------------------------------------------------------------------
 
-sealed trait DomainError extends Throwable:
+trait DomainError extends Throwable:
   def message: String
   override def getMessage: String = message
 

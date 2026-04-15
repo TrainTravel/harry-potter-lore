@@ -143,7 +143,8 @@ object CostTrackerAlgebra:
         )(fa: IO[(Int, Int, A)]): IO[A] =
           for
             start              <- IO(System.nanoTime())
-            (tIn, tOut, result) <- fa
+            triple             <- fa
+            (tIn, tOut, result) = triple
             latencyMs           = (System.nanoTime() - start) / 1_000_000.0
             _                  <- record(CostEvent(model, capability, tIn, tOut, latencyMs, sessionId, turnId))
           yield result
