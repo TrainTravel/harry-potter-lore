@@ -1,5 +1,170 @@
 # Architecture
 
+## Observability — Events and OpenTelemetry
+
+### The core idea: what is observability?
+
+Observability answers the question: **"what is my system actually doing?"**
+
+Without it you only know two things — the user sent a query and an answer came back.
+With it you know every step in between, how long each one took, and exactly where
+something went wrong when it does.
+
+### How a single agent turn is recorded
+
+```
+  USER
+   │
+   │  "Who created the Horcruxes?"
+   ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                        Agent Turn                                    │
+│                                                                      │
+│  step 1 ── Retrieve lore chunks from ChromaDB                       │
+│             tracer.event(RETRIEVAL, {query: "...", chunks: 5})       │
+│                                                                      │
+│  step 2 ── Assemble context window                                   │
+│             tracer.event(CONTEXT_BUILT, {tokens: 1420})              │
+│                                                                      │
+│  step 3 ── Call LLM                                                  │
+│             tracer.event(LLM_CALL, {model: "gpt-4o", tokens: 512})  │
+│                                                                      │
+│  step 4 ── Return answer to user    ◄── user gets answer HERE        │
+│             tracer.event(TURN_END,  {latency_ms: 1820})             │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+   │
+   │  answer: "Voldemort created seven Horcruxes..."
+   ▼
+  USER  ◄── receives answer in ~1.8 s, never waits for logging
+```
+
+The critical point: **the user gets their answer before any logging happens.**
+Observability runs on a background task — it never adds to the user's wait time.
+
+### What happens inside tracer.event()
+
+Every call to `tracer.event()` fans out to two independent destinations at once:
+
+```
+                    tracer.event(LLM_CALL, {...})
+                             │
+              ┌──────────────┴──────────────┐
+              │                             │
+              ▼                             ▼
+   ┌─────────────────────┐      ┌──────────────────────┐
+   │  asyncio.create_task│      │   otel_bridge        │
+   │  (fire-and-forget)  │      │   .emit_span()       │
+   └─────────────────────┘      └──────────────────────┘
+              │                             │
+              │ runs AFTER turn returns     │ runs NOW, tiny (μs)
+              ▼                             ▼
+   ┌─────────────────────┐      ┌──────────────────────┐
+   │     SQLite          │      │  BatchSpanProcessor  │
+   │   traces.db         │      │  (in-memory buffer)  │
+   └─────────────────────┘      └──────────────────────┘
+              │                             │
+              │                             │ flushes every ~5 s
+              │                             ▼
+              │                  ┌──────────────────────┐
+              │                  │   Jaeger collector   │
+              │                  │  (OTLP gRPC :4317)   │
+              │                  └──────────────────────┘
+              │                             │
+              ▼                             ▼
+   ┌─────────────────────┐      ┌──────────────────────┐
+   │  CLI / HTTP replay  │      │    Jaeger Web UI     │
+   │                     │      │   localhost:16686    │
+   │  python -m          │      │                      │
+   │  context_harness    │      │  flame chart showing │
+   │  .trace_view <id>   │      │  every step as a     │
+   │                     │      │  coloured bar with   │
+   │  GET /trace/<id>    │      │  its exact duration  │
+   └─────────────────────┘      └──────────────────────┘
+```
+
+### What each destination gives you
+
+**SQLite → CLI / HTTP** — *replay*
+
+You have the turn ID (logged when the user query arrived). Something went wrong.
+You run:
+
+```bash
+python -m context_harness.trace_view abc-123
+```
+
+and see:
+```
+╭─ Trace  turn_id=abc-123 ──────────────────────────────────────────────╮
+│  #   Kind            Latency   Payload                                 │
+│  1   turn_start                {}                                      │
+│  2   retrieval        42.1ms   {"query": "Horcruxes", "chunks": 5}     │
+│  3   context_built     3.2ms   {"tokens": 1420, "strategy": "sandwich"}│
+│  4   llm_call        1710.0ms  {"model": "gpt-4o", "tokens_in": 512}  │
+│  5   turn_end                  {"answer_len": 340}                     │
+╰────────────────────────────────────────────────────────────────────────╯
+  5 events   wall 1820ms   sum latency 1755ms
+```
+
+You can see immediately that 94% of the turn time was the LLM call — not retrieval,
+not context assembly. No guessing.
+
+**Jaeger UI** — *visual flame chart*
+
+Open `http://localhost:16686`, select service `deeptutor`, click Find Traces.
+Each turn appears as a horizontal bar. Click it to expand into a flame chart:
+
+```
+  turn abc-123  ████████████████████████████████████  1820 ms
+    retrieval   ██  42 ms
+    context     ░ 3 ms
+    llm_call    ████████████████████████████████  1710 ms   ← the slow part
+    turn_end    ░ 1 ms
+```
+
+This is what observability looks like to a client or non-expert:
+> "I can click on any request and see a picture of where the time went."
+
+### What OpenTelemetry actually is
+
+OpenTelemetry (OTel) is a **standard wire format and SDK** for emitting spans.
+
+A **span** = one unit of work with a name, a start time, an end time, and key/value
+attributes. Our `tracer.event(LLM_CALL, {...})` becomes one span named `"llm_call"`
+with attributes like `turn.id`, `latency_ms`, `payload.model`.
+
+OTel is the standard — Jaeger is just one of many backends that can receive it.
+The same spans could go to Datadog, Grafana Tempo, AWS X-Ray, or Honeycomb
+by changing one environment variable (`OTEL_EXPORTER_OTLP_ENDPOINT`). That
+portability is the reason to use OTel rather than a vendor-specific SDK.
+
+```
+  Our code                OTel SDK              Any backend
+  ────────                ────────              ───────────
+  otel_bridge             BatchSpan             Jaeger
+  .emit_span()  ───────►  Processor   ───────►  Datadog
+                          (buffers,             Grafana Tempo
+                           retries,             AWS X-Ray
+                           exports)             Honeycomb
+```
+
+### Starting the full observability stack
+
+```bash
+# 1. Start Jaeger (accepts OTel spans, serves the UI)
+docker compose -f docker-compose.jaeger.yml up -d
+
+# 2. Configure OTel in your Python session
+from context_harness.otel_bridge import configure
+configure(service_name="deeptutor", endpoint="http://localhost:4317")
+
+# 3. Run agent queries — spans flow to Jaeger automatically
+# 4. Open http://localhost:16686 — select service "deeptutor" → Find Traces
+```
+
+---
+
 ## Retrieval Ranking Pipeline
 
 The pipeline has two stages: ANN retrieval from ChromaDB, then optional MMR reranking.
