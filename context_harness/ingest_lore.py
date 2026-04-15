@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .rag_pipeline import RAGPipeline, ChunkingStrategy
+from .rag_pipeline import RAGPipeline, ChunkingStrategy, SourceType
 from .document_registry import DocumentRegistry
 
 
@@ -89,7 +89,12 @@ def ingest(verbose: bool = True, persist: bool = True) -> DocumentRegistry:
     )
 
     for doc_id, text in docs:
-        result = registry.upsert(doc_id, text, source="hp_lore.txt")
+        result = registry.upsert(
+            doc_id, text,
+            universe="hp",
+            source_type=SourceType.FICTIONAL_CANON,
+            source="hp_lore.txt",
+        )
         if verbose:
             print(f"  [{result.action:8s}] {doc_id} — {result.chunk_count} chunks")
 

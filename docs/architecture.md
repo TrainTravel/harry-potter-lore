@@ -2,7 +2,8 @@
 
 ## Retrieval Ranking Pipeline
 
-The pipeline has two stages: ANN retrieval from ChromaDB, then optional MMR reranking.
+The pipeline has two stages: ANN retrieval from ChromaDB (with optional metadata
+filtering), then optional MMR reranking.
 
 ```
                         ┌─────────────────────────────────────────────────────┐
@@ -94,15 +95,70 @@ The pipeline has two stages: ANN retrieval from ChromaDB, then optional MMR rera
 | Collection initialisation | `context_harness/rag_pipeline.py` | `_init_chromadb()` L131 |
 | DSPy k=10 / k=3 per mode | `context_harness/dspy_agent.py` | `DeepResearchModule` / `GuidedLearningModule` |
 
+### Chunk provenance metadata
+
+Every chunk stored in ChromaDB now carries three provenance fields in its metadata:
+
+| Field | Type | Example values | Purpose |
+|---|---|---|---|
+| `universe` | `str` | `"hp"`, `"lotr"`, `"real_world"` | Corpus namespace for filtered queries |
+| `source_type` | `SourceType` enum | `fictional_canon`, `wiki`, `biography`, `news` | Epistemic classification for LLM framing |
+| `as_of` | `str \| None` | `"2024-03"`, `None` | Freshness date for real-world sources |
+
+These fields flow through the full stack:
+
+```
+RAGPipeline.ingest(universe=, source_type=, as_of=)
+    └─► stored in ChromaDB chunk metadata
+DocumentRegistry.upsert(universe=, source_type=, as_of=)
+    └─► forwarded to ingest(), also saved in doc_records SQLite table
+RAGPipeline.retrieve(universe=, source_type=)
+    └─► translated to ChromaDB where= filter
+```
+
+### Metadata filter syntax
+
+```python
+# Restrict to one universe
+pipeline.retrieve("dark lords", universe="hp")
+# → where={"universe": {"$eq": "hp"}}
+
+# Restrict to one source type
+pipeline.retrieve("Elon Musk", source_type=SourceType.WIKI)
+# → where={"source_type": {"$eq": "wiki"}}
+
+# Both filters combined
+pipeline.retrieve("powerful leaders", universe="real_world", source_type=SourceType.BIOGRAPHY)
+# → where={"$and": [{"universe": {"$eq": "real_world"}}, {"source_type": {"$eq": "biography"}}]}
+
+# Cross-universe (no filter) — semantic search across all corpora
+pipeline.retrieve("leaders who consolidated power", use_mmr=True)
+```
+
+### MMR is now wired
+
+Pass `use_mmr=True` to `retrieve()` to enable MMR reranking inline.
+Previously `mmr_rerank()` existed but was never called from the agent path.
+
+```python
+# DeepResearchModule — cross-universe query with diversity reranking
+chunks = pipeline.retrieve(question, top_k=10, use_mmr=True, mmr_lambda=0.5)
+```
+
+### Chunking strategies
+
+| Strategy | Best for | Behaviour |
+|---|---|---|
+| `RECURSIVE` | HP-style narrative lore (default) | paragraph → sentence → fixed fallback |
+| `WIKI` | Wikipedia / biographical articles | splits on `##` section headers; oversized sections fall back to RECURSIVE |
+| `PARAGRAPH` | Short structured documents | blank-line boundaries only |
+| `SENTENCE` | Dense academic text | groups N sentences per chunk |
+| `FIXED` | Fallback / uniform sizing | sliding window with overlap |
+
 ### Multi-universe note
 
 ANN search is purely geometric — it returns the closest vectors regardless of which
 universe they originated from. Adding a second universe to the same collection gives
 cross-universe semantic search for free. To restrict results to one universe, pass a
-metadata filter:
-
-```python
-collection.query(query_texts=[q], n_results=k, where={"universe": "hp"})
-```
-
-or use one collection per universe and route the query before retrieval.
+`universe=` filter to `retrieve()` or use one collection per universe and route the
+query before retrieval.

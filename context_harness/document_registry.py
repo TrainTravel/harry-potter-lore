@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
 
-from .rag_pipeline import RAGPipeline, Chunk, ChunkingStrategy
+from .rag_pipeline import RAGPipeline, Chunk, ChunkingStrategy, SourceType
 
 
 # ---------------------------------------------------------------------------
@@ -44,6 +44,9 @@ class DocRecord:
     chunk_ids: List[str]       # IDs of all chunks currently in the vector store
     chunk_count: int
     embedding_model: str
+    universe: str = "hp"
+    source_type: str = SourceType.FICTIONAL_CANON.value
+    as_of: Optional[str] = None
     ingested_at: float = field(default_factory=time.time)
     last_modified: float = field(default_factory=time.time)
 
@@ -91,6 +94,9 @@ class DocumentRegistry:
                 chunk_ids       TEXT NOT NULL,
                 chunk_count     INTEGER NOT NULL,
                 embedding_model TEXT NOT NULL,
+                universe        TEXT NOT NULL DEFAULT 'hp',
+                source_type     TEXT NOT NULL DEFAULT 'fictional_canon',
+                as_of           TEXT,
                 ingested_at     REAL NOT NULL,
                 last_modified   REAL NOT NULL
             );
@@ -101,10 +107,26 @@ class DocumentRegistry:
     # Public API
     # ------------------------------------------------------------------
 
-    def upsert(self, doc_id: str, text: str, **metadata) -> UpsertResult:
+    def upsert(
+        self,
+        doc_id: str,
+        text: str,
+        universe: str = "hp",
+        source_type: SourceType = SourceType.FICTIONAL_CANON,
+        as_of: Optional[str] = None,
+        **metadata,
+    ) -> UpsertResult:
         """
         Smart upsert: skip unchanged, delete-then-reingest changed, ingest new.
         Returns a UpsertResult describing what happened.
+
+        Args:
+            doc_id:      Stable document identifier.
+            text:        Full document text.
+            universe:    Corpus namespace ("hp", "lotr", "real_world", …).
+            source_type: Epistemic classification of the source.
+            as_of:       Freshness date "YYYY-MM" for real-world docs.
+            **metadata:  Additional key/value pairs forwarded to ChromaDB.
         """
         new_hash = _sha256(text)
         existing = self._get(doc_id)
@@ -119,8 +141,15 @@ class DocumentRegistry:
         else:
             action = "created"
 
-        # Ingest fresh chunks
-        chunks = self._pipeline.ingest(text, doc_id, embedding_model=self._embedding_model, **metadata)
+        # Ingest fresh chunks with provenance metadata
+        chunks = self._pipeline.ingest(
+            text, doc_id,
+            universe=universe,
+            source_type=source_type,
+            as_of=as_of,
+            embedding_model=self._embedding_model,
+            **metadata,
+        )
         chunk_ids = [c.chunk_id for c in chunks]
 
         record = DocRecord(
@@ -129,6 +158,9 @@ class DocumentRegistry:
             chunk_ids=chunk_ids,
             chunk_count=len(chunks),
             embedding_model=self._embedding_model,
+            universe=universe,
+            source_type=source_type.value,
+            as_of=as_of,
         )
         self._save(record)
         return UpsertResult(doc_id=doc_id, action=action, chunk_count=len(chunks))
@@ -162,17 +194,23 @@ class DocumentRegistry:
 
     def _get(self, doc_id: str) -> Optional[DocRecord]:
         row = self._conn.execute(
-            "SELECT * FROM doc_records WHERE doc_id=?", (doc_id,)
+            "SELECT doc_id, content_hash, chunk_ids, chunk_count, embedding_model, "
+            "universe, source_type, as_of, ingested_at, last_modified "
+            "FROM doc_records WHERE doc_id=?",
+            (doc_id,),
         ).fetchone()
         if row is None:
             return None
-        doc_id_, hash_, chunk_ids_json, count, model, ingested, modified = row
+        doc_id_, hash_, chunk_ids_json, count, model, universe, source_type, as_of, ingested, modified = row
         return DocRecord(
             doc_id=doc_id_,
             content_hash=hash_,
             chunk_ids=_deserialise_ids(chunk_ids_json),
             chunk_count=count,
             embedding_model=model,
+            universe=universe or "hp",
+            source_type=source_type or SourceType.FICTIONAL_CANON.value,
+            as_of=as_of or None,
             ingested_at=ingested,
             last_modified=modified,
         )
@@ -180,13 +218,18 @@ class DocumentRegistry:
     def _save(self, record: DocRecord) -> None:
         self._conn.execute(
             """INSERT OR REPLACE INTO doc_records
-               VALUES (?,?,?,?,?,?,?)""",
+               (doc_id, content_hash, chunk_ids, chunk_count, embedding_model,
+                universe, source_type, as_of, ingested_at, last_modified)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
             (
                 record.doc_id,
                 record.content_hash,
                 _serialise_ids(record.chunk_ids),
                 record.chunk_count,
                 record.embedding_model,
+                record.universe,
+                record.source_type,
+                record.as_of,
                 record.ingested_at,
                 record.last_modified,
             ),
