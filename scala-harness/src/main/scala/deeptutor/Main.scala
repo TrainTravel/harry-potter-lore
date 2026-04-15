@@ -40,12 +40,15 @@ object Main extends IOApp:
       // ── Fix #5: start cost tracker ────────────────────────────────────────
       costTracker <- CostTrackerAlgebra.inMemory
 
+      // ── Observability: process-level trace store for GET /trace/:id ───────
+      traceStore  <- TraceStoreAlgebra.inMemory
+
       // Seed with a few HP lore snippets so the server is queryable immediately
       _           <- seedLore(store)
       chunkCount  <- store.count
       _           <- versionGuard.updateStats(docCount = 3, chunkCount = chunkCount)
 
-      routes  = LoreRoutes(store, costTracker).routes
+      routes  = LoreRoutes(store, costTracker, traceStore).routes
       httpApp = HttpLogger.httpApp(logHeaders = true, logBody = false)(
                   CORS.policy.withAllowOriginAll(routes.orNotFound)
                 )

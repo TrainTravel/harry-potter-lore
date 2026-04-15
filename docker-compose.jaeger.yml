@@ -1,0 +1,67 @@
+# Jaeger all-in-one for local OTel trace viewing
+# ================================================
+# Starts Jaeger + the Python harness (FastAPI) and connects them so every
+# Tracer.event() call that goes through otel_bridge appears as a span in
+# the Jaeger UI at http://localhost:16686.
+#
+# Usage:
+#   docker compose -f docker-compose.jaeger.yml up -d
+#   # 1. Open http://localhost:16686   — Jaeger UI
+#   # 2. Run your agent queries
+#   # 3. Select service "deeptutor" in the UI and click "Find Traces"
+#
+# Stopping:
+#   docker compose -f docker-compose.jaeger.yml down
+#
+# Ports used:
+#   4317  — OTLP gRPC receiver (Jaeger ← Python harness)
+#   16686 — Jaeger web UI
+#   8000  — Python FastAPI harness (GET /trace/{turn_id}, GET /traces)
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Jaeger all-in-one — collector + query + UI in a single container
+  # ---------------------------------------------------------------------------
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "4317:4317"    # OTLP gRPC — where the Python harness sends spans
+      - "4318:4318"    # OTLP HTTP — alternative ingestion path
+      - "16686:16686"  # Jaeger web UI
+      - "14268:14268"  # Jaeger HTTP collector (legacy Thrift, optional)
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider",
+             "http://localhost:16686/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Python FastAPI harness — trace replay + HTTP interface
+  # ---------------------------------------------------------------------------
+  harness:
+    build:
+      context: .
+      dockerfile: Dockerfile.harness
+    container_name: deeptutor-harness
+    environment:
+      - TRACE_DB_PATH=/data/traces.db
+      - OTEL_SERVICE_NAME=deeptutor
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=true
+    volumes:
+      - ./data:/data   # mount local data dir so traces.db is accessible
+    ports:
+      - "8000:8000"
+    depends_on:
+      jaeger:
+        condition: service_healthy
+    command: >
+      uvicorn context_harness.app:app
+        --host 0.0.0.0
+        --port 8000
+        --workers 1

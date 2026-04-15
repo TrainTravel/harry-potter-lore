@@ -26,6 +26,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from . import otel_bridge
+
 
 # ---------------------------------------------------------------------------
 # Event types
@@ -107,6 +109,14 @@ class Tracer:
         if self._store:
             # Fire-and-forget — never block the turn
             asyncio.create_task(self._store.save(evt))
+        # OTel span — no-op if otel_bridge.configure() was never called
+        otel_bridge.emit_span(
+            turn_id=self._turn_id,
+            seq=evt.seq,
+            kind_value=evt.kind.value,
+            payload=evt.payload,
+            latency_ms=evt.latency_ms,
+        )
         return evt
 
     def events(self) -> List[TraceEvent]:

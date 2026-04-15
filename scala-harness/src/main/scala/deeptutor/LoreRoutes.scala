@@ -7,6 +7,7 @@ import org.http4s.*
 import org.http4s.circe.*
 import org.http4s.circe.CirceEntityDecoder.*
 import org.http4s.dsl.io.*
+import org.http4s.server.middleware.QueryParamDecoder
 import org.typelevel.log4cats.Logger
 import java.util.UUID
 import fs2.Stream
@@ -17,7 +18,11 @@ import fs2.Stream
 // Context Engineering insight: the HTTP layer is *thin*.  It decodes requests,
 // delegates to the pipeline, and encodes responses.  No business logic lives here.
 
-class LoreRoutes(store: VectorStoreAlgebra[IO], costTracker: CostTrackerAlgebra[IO] = null)(using logger: Logger[IO]):
+class LoreRoutes(
+    store: VectorStoreAlgebra[IO],
+    costTracker: CostTrackerAlgebra[IO]   = null,
+    traceStore:  TraceStoreAlgebra[IO]    = null,
+)(using logger: Logger[IO]):
 
   // Per-request window factory (in production: session-keyed map)
   private def freshWindow: IO[ContextWindowAlgebra[IO]] =
@@ -95,7 +100,43 @@ class LoreRoutes(store: VectorStoreAlgebra[IO], costTracker: CostTrackerAlgebra[
       Option(costTracker) match
         case None    => Ok(Map("error" -> "cost tracker not configured").asJson)
         case Some(t) => t.summary.flatMap(s => Ok(s.asJson))
+
+    // -------------------------------------------------------------------------
+    // GET /traces  — list recent turn IDs
+    // -------------------------------------------------------------------------
+    case GET -> Root / "traces" :? LimitParam(limit) =>
+      Option(traceStore) match
+        case None    => Ok(Map("turns" -> List.empty[TurnSummary]).asJson)
+        case Some(ts) =>
+          ts.listTurns(limit.getOrElse(20)).flatMap(turns =>
+            Ok(Map("turns" -> turns).asJson)
+          )
+
+    // -------------------------------------------------------------------------
+    // GET /trace/{turn_id}  — replay a single turn's events
+    // -------------------------------------------------------------------------
+    case GET -> Root / "trace" / turnId =>
+      Option(traceStore) match
+        case None     => NotFound(Map("error" -> s"trace store not configured").asJson)
+        case Some(ts) =>
+          ts.getTurn(turnId).flatMap { events =>
+            if events.isEmpty then
+              NotFound(Map("error" -> s"No trace for turn_id=$turnId").asJson)
+            else
+              val wallMs =
+                if events.size > 1 then (events.last.ts - events.head.ts).toDouble else 0.0
+              val errCount = events.count(_.kind == TraceEventKind.Error)
+              Ok(Map(
+                "turn_id"         -> turnId.asJson,
+                "event_count"     -> events.size.asJson,
+                "wall_latency_ms" -> wallMs.asJson,
+                "error_count"     -> errCount.asJson,
+                "events"          -> events.asJson,
+              ).asJson)
+          }
   }
+
+  private object LimitParam extends OptionalQueryParamDecoderMatcher[Int]("limit")
 
   // ---------------------------------------------------------------------------
   // Stub answer — replace with real LLM call
