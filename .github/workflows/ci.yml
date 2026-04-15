@@ -34,7 +34,10 @@ jobs:
           restore-keys: pip-${{ matrix.python-version }}-
 
       - name: Install test dependencies
-        run: pip install pytest pytest-asyncio
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
 
       - name: Run pytest
         run: python -m pytest tests/ -v --tb=short
@@ -68,9 +71,9 @@ jobs:
           restore-keys: sbt-${{ matrix.java }}-
 
       - name: Install sbt
-        run: |
-          curl -fL "https://github.com/sbt/sbt/releases/download/v1.10.6/sbt-1.10.6.tgz" | tar xz -C /usr/local
-          echo "/usr/local/sbt/bin" >> $GITHUB_PATH
+        uses: sbt/setup-sbt@v1
+        with:
+          sbt-runner-version: 1.10.6
 
       - name: Run sbt test
         working-directory: scala-harness
