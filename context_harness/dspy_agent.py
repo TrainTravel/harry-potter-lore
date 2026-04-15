@@ -1,0 +1,277 @@
+"""
+DSPy Agent System
+=================
+Two-mode agent backed by DSPy for automated prompt optimisation and ChromaDB
+for vector memory.
+
+Design (from design summary):
+  - Signatures declare input/output contracts. Model weights never change.
+  - Modules compose Signatures with ChromaDB retrieval.
+  - Compiled JSON artifacts store the optimised few-shots + instructions
+    produced by a DSPy optimizer. Recompile when the model or training set changes.
+  - manifest.json guards against embedding model drift (backfill guard).
+
+Modes
+-----
+  deep_research    — broad retrieval (k=10), outputs: answer, citations,
+                     confidence, gaps
+  guided_learning  — narrow retrieval (k=3) filtered to past attempts,
+                     Socratic outputs: hint, next_question, explanation
+
+Usage
+-----
+    from context_harness.dspy_agent import DSPyAgent
+    from context_harness.ingest_lore import build_pipeline
+
+    pipeline = build_pipeline(persist=False)
+    agent = DSPyAgent(pipeline)
+    result = agent.forward("deep_research", "Who created the Deathly Hallows?")
+    print(result.answer, result.citations)
+
+Export / import
+---------------
+    agent.save("my_profile.agent")
+    # → my_profile.agent/deep_research.json
+    # → my_profile.agent/guided_learning.json
+    # → my_profile.agent/manifest.json
+
+    agent2 = DSPyAgent(pipeline, export_dir="my_profile.agent")
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+import dspy
+
+from .rag_pipeline import RAGPipeline
+
+
+# ---------------------------------------------------------------------------
+# Signatures
+# ---------------------------------------------------------------------------
+
+class DeepResearchSignature(dspy.Signature):
+    """Answer a question with depth and precision using retrieved lore context.
+    Cite your sources, rate your confidence, and flag information gaps."""
+
+    question: str = dspy.InputField(desc="the research question")
+    context: str  = dspy.InputField(desc="retrieved lore passages, each prefixed [doc_id]")
+
+    answer:     str = dspy.OutputField(desc="comprehensive answer drawn from context")
+    citations:  str = dspy.OutputField(desc="space-separated doc_ids referenced in the answer")
+    confidence: str = dspy.OutputField(desc="one of: low / medium / high")
+    gaps:       str = dspy.OutputField(desc="aspects the context does not cover, or 'none'")
+
+
+class GuidedLearningSignature(dspy.Signature):
+    """Socratic tutor. Guide the learner without revealing the answer directly.
+    Use their past attempts to personalise the hint."""
+
+    question:     str = dspy.InputField(desc="the learner's question")
+    context:      str = dspy.InputField(desc="relevant lore context for this concept")
+    past_attempts: str = dspy.InputField(desc="learner's prior answers/attempts, or 'none'")
+
+    hint:          str = dspy.OutputField(desc="a guiding hint that does not give the answer away")
+    next_question: str = dspy.OutputField(desc="a follow-up question to deepen understanding")
+    explanation:   str = dspy.OutputField(desc="concept explanation without revealing the direct answer")
+
+
+# ---------------------------------------------------------------------------
+# Modules
+# ---------------------------------------------------------------------------
+
+class DeepResearchModule(dspy.Module):
+    """
+    Broad retrieval (k=10) + ChainOfThought over DeepResearchSignature.
+    Optimizer metric: citation accuracy + source coverage.
+    """
+
+    def __init__(self, pipeline: RAGPipeline, k: int = 10) -> None:
+        super().__init__()
+        self._pipeline = pipeline
+        self._k = k
+        self.predict = dspy.ChainOfThought(DeepResearchSignature)
+
+    def forward(self, question: str, user_profile: Optional[Dict[str, Any]] = None) -> dspy.Prediction:
+        chunks = self._pipeline.retrieve(question, top_k=self._k)
+        context = "\n\n".join(f"[{c.doc_id}] {c.text}" for c in chunks) or "No context retrieved."
+        return self.predict(question=question, context=context)
+
+
+class GuidedLearningModule(dspy.Module):
+    """
+    Narrow retrieval (k=3) biased toward past-attempt context
+    + ChainOfThought over GuidedLearningSignature.
+    Optimizer metric: Socratic score (penalises giving the answer directly).
+    """
+
+    def __init__(self, pipeline: RAGPipeline, k: int = 3) -> None:
+        super().__init__()
+        self._pipeline = pipeline
+        self._k = k
+        self.predict = dspy.ChainOfThought(GuidedLearningSignature)
+
+    def forward(
+        self,
+        question: str,
+        concept: str = "",
+        past_attempts: str = "none",
+        user_profile: Optional[Dict[str, Any]] = None,
+    ) -> dspy.Prediction:
+        query = f"{concept} {question}".strip()
+        chunks = self._pipeline.retrieve(query, top_k=self._k)
+        context = "\n\n".join(f"[{c.doc_id}] {c.text}" for c in chunks) or "No context retrieved."
+        return self.predict(question=question, context=context, past_attempts=past_attempts)
+
+
+# ---------------------------------------------------------------------------
+# Agent — mode router
+# ---------------------------------------------------------------------------
+
+MODES = {"deep_research", "guided_learning"}
+
+
+class DSPyAgent:
+    """
+    Routes queries to the correct compiled DSPy module.
+
+    Each mode is a separate Module + compiled JSON artifact. Both are needed
+    for full portability: ChromaDB snapshot + compiled JSONs = your .agent export.
+
+    Usage:
+        agent = DSPyAgent(pipeline)
+        result = agent.forward("deep_research", "Who are the Peverell brothers?")
+    """
+
+    def __init__(
+        self,
+        pipeline: RAGPipeline,
+        export_dir: Optional[str] = None,
+        research_k: int = 10,
+        learning_k: int = 3,
+    ) -> None:
+        self._pipeline = pipeline
+        self._modules: Dict[str, dspy.Module] = {
+            "deep_research":   DeepResearchModule(pipeline, k=research_k),
+            "guided_learning": GuidedLearningModule(pipeline, k=learning_k),
+        }
+        if export_dir:
+            self._load(Path(export_dir))
+
+    # ------------------------------------------------------------------
+    # Inference
+    # ------------------------------------------------------------------
+
+    def forward(self, mode: str, question: str, **kwargs) -> dspy.Prediction:
+        if mode not in MODES:
+            raise ValueError(f"Unknown mode {mode!r}. Valid modes: {sorted(MODES)}")
+        return self._modules[mode].forward(question=question, **kwargs)
+
+    # ------------------------------------------------------------------
+    # Export / import
+    # ------------------------------------------------------------------
+
+    def save(self, export_dir: str) -> None:
+        """Persist compiled programs and manifest to <export_dir>/."""
+        path = Path(export_dir)
+        path.mkdir(parents=True, exist_ok=True)
+
+        for mode, module in self._modules.items():
+            module.save(str(path / f"{mode}.json"))
+
+        _write_manifest(path, embedding_model=self._pipeline.embedding_model_name)
+
+    def _load(self, path: Path) -> None:
+        """Load compiled programs after validating manifest."""
+        manifest_path = path / "manifest.json"
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text())
+            _validate_manifest(manifest, self._pipeline.embedding_model_name)
+
+        for mode, module in self._modules.items():
+            artifact = path / f"{mode}.json"
+            if artifact.exists():
+                module.load(str(artifact))
+
+    # ------------------------------------------------------------------
+    # Optimiser helpers (called during training, not inference)
+    # ------------------------------------------------------------------
+
+    def compile_deep_research(self, optimizer: dspy.teleprompt.Teleprompter, trainset: list) -> None:
+        """Run the optimizer on the deep_research module and update in place."""
+        self._modules["deep_research"] = optimizer.compile(
+            self._modules["deep_research"], trainset=trainset
+        )
+
+    def compile_guided_learning(self, optimizer: dspy.teleprompt.Teleprompter, trainset: list) -> None:
+        """Run the optimizer on the guided_learning module and update in place."""
+        self._modules["guided_learning"] = optimizer.compile(
+            self._modules["guided_learning"], trainset=trainset
+        )
+
+
+# ---------------------------------------------------------------------------
+# Manifest helpers
+# ---------------------------------------------------------------------------
+
+_SCHEMA_VERSION = 1
+_DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+
+
+def _write_manifest(path: Path, embedding_model: str = _DEFAULT_EMBEDDING_MODEL) -> None:
+    hashes = {}
+    for mode in MODES:
+        artifact = path / f"{mode}.json"
+        if artifact.exists():
+            hashes[mode] = _file_sha256(artifact)
+
+    manifest = {
+        "schema_version": _SCHEMA_VERSION,
+        "embedding_model": embedding_model,
+        "program_hashes": hashes,
+        "created_at": time.time(),
+    }
+    (path / "manifest.json").write_text(json.dumps(manifest, indent=2))
+
+
+def _validate_manifest(manifest: dict, current_embedding_model: str) -> None:
+    """Raise BackfillRequired if the manifest is stale."""
+    stored_model = manifest.get("embedding_model", "")
+    if stored_model and stored_model != current_embedding_model:
+        raise BackfillRequired(
+            f"Embedding model changed: manifest has {stored_model!r}, "
+            f"runtime uses {current_embedding_model!r}. Re-embed before loading."
+        )
+
+
+def _file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+class BackfillRequired(RuntimeError):
+    """Raised when manifest detects an embedding model mismatch."""
+
+
+# ---------------------------------------------------------------------------
+# RAGPipeline extension — expose embedding model name
+# ---------------------------------------------------------------------------
+# Monkey-patch a property onto RAGPipeline so DSPyAgent can read the model name
+# without importing it from a different layer.
+
+if not hasattr(RAGPipeline, "embedding_model_name"):
+    RAGPipeline.embedding_model_name = property(  # type: ignore[assignment]
+        lambda self: getattr(self, "_embedding_model_name", _DEFAULT_EMBEDDING_MODEL)
+    )
+    _orig_init = RAGPipeline.__init__
+
+    def _patched_init(self, *args, **kwargs):
+        self._embedding_model_name = kwargs.get("embedding_model", _DEFAULT_EMBEDDING_MODEL)
+        _orig_init(self, *args, **kwargs)
+
+    RAGPipeline.__init__ = _patched_init  # type: ignore[assignment]

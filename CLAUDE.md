@@ -6,6 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Harry Potter lore agent (`lore_agent.ipynb`) that uses Google ADK for agent orchestration and ChromaDB as a vector store for RAG over HP lore content.
 
+## Design decisions
+
+See `docs/adr/` for Architecture Decision Records. Read `docs/adr/README.md`
+before proposing changes to cross-cutting concerns (observability, reliability,
+schema evolution, agent topology).
+
 ## Environment Setup
 
 The virtualenv is at `./list/` (managed by `uv`, Python 3.8):
