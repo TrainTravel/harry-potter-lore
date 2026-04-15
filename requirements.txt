@@ -78,7 +78,7 @@ optuna==4.8.0
 orjson==3.10.15
 overrides==7.7.0
 packaging==26.0
-pandas==2.0.3
+pandas>=2.2.0
 parso==0.8.6
 pexpect==4.9.0
 pickleshare==0.7.5
