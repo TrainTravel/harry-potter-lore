@@ -6,7 +6,9 @@ Covers: window management, context assembly, RAG pipeline, and prompt templating
 """
 
 from .context_manager import ContextWindow, ContextEntry, ContextRole
-from .rag_pipeline import RAGPipeline, Chunk, ChunkingStrategy
+from .rag_pipeline import (
+    RAGPipeline, Chunk, ScoredChunk, Document, ChunkingStrategy, ChunkType,
+)
 from .context_assembler import ContextAssembler, AssemblyStrategy
 from .prompt_templates import PromptTemplate, SystemPrompt, LorePrompt
 
@@ -31,7 +33,10 @@ __all__ = [
     "ContextRole",
     "RAGPipeline",
     "Chunk",
+    "ScoredChunk",
+    "Document",
     "ChunkingStrategy",
+    "ChunkType",
     "ContextAssembler",
     "AssemblyStrategy",
     "PromptTemplate",

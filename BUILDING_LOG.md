@@ -581,3 +581,104 @@ that measures latency and records a `TraceEvent` automatically.
 - [ ] Wire `SecurityPipeline` + `Tracer` + `ResilientCaller` into `TurnRuntimeManager`
 - [ ] Scala tests for `ResilienceAlgebra` and `TracerAlgebra`
 - [ ] HTTP endpoints for trace replay (`GET /trace/{turn_id}`) and eval metrics (`GET /eval`)
+---
+
+## Session 3 — First real agent + eval framework
+
+**Date:** 2026-04-14
+
+### Framing: no learning without evals
+
+The previous sessions built 2,250 lines of `context_harness/` infrastructure and 860 lines of tests — but the tests only verified library-level invariants ("does the cache evict?"). They did not verify that the library actually helps answer HP lore questions well. The user correctly noted that code they can't independently verify teaches them very little.
+
+So this session focused on building a **real feedback loop**: a hand-written corpus, an evaluation question set, and an agent that can be measured against both.
+
+### What we built
+
+**`evals/corpus.py`** — 10 small HP lore passages (Dumbledore, Voldemort, Horcruxes, the Deathly Hallows, Hogwarts houses, etc.) with stable `doc_id`s so eval questions can assert which passage should be retrieved.
+
+**`evals/questions.py`** — 12 eval questions spanning three kinds:
+- `easy`: answer in a single passage
+- `multi`: answer requires combining info from 2+ passages
+- `distractor`: answer is NOT in the corpus; the agent should refuse
+
+Each question carries an `expected_docs` set and a `reference_answer` string for grading.
+
+**`evals/eval_rag.py`** — RAG-only harness. For each question, measures:
+- `hit@k`: did any expected doc appear in top-k?
+- `recall@k`: what fraction of expected docs appeared?
+- `mean_tokens` retrieved (proxy for context cost)
+- `mean_latency_ms`
+
+Sweeps across all four `ChunkingStrategy` values. **No API calls, no key needed** — this runs instantly and gives a concrete feedback signal for any RAG change.
+
+**`evals/agent.py`** — minimal LLM agent with manual tool loop:
+- Gemini 2.5 Flash-Lite (switched from Claude after credit balance hit zero)
+- One tool: `search_lore(query, top_k)` wired to `RAGPipeline.retrieve`
+- System prompt forces the agent to cite only the corpus and refuse for out-of-corpus questions
+- Tracks tokens, tool calls, turns, latency per question
+- Retry helper (`call_with_retry`) for transient 429/5xx — exponential backoff + jitter
+
+**`evals/eval_agent.py`** — end-to-end runner that grades with Gemini Flash-Lite as LLM-as-judge. Reports correctness by question kind, retrieval hit rate (parsed from the agent's tool-result transcript), per-question tokens and cost, and totals.
+
+### Bugs found and fixed along the way
+
+**Bug 1: silent doc_id mismatch in retrieval.**
+`RAGPipeline.ingest` set `doc_id` as a Chunk attribute but did *not* persist it in the metadata dict. ChromaDB only persists metadata dicts; at retrieval time the pipeline looked up `meta.get("doc_id", "unknown")` and got `"unknown"` for every chunk. Eval output showed expected-vs-got lines full of `'unknown'` — a classic attribute-vs-metadata desync.
+
+Fix: always write `doc_id` into the metadata dict at ingest time.
+
+**Bug 2: `Chunk`'s dual-purpose `score` field.**
+A `Chunk` carried both stored content (text, doc_id, metadata) and per-query state (`score`, filled after retrieval). `score=0.0` was ambiguous — "never retrieved" vs "retrieved with zero similarity" — and the attribute-vs-metadata desync above was a direct symptom of the design muddle.
+
+Fix: split into two frozen dataclasses.
+- `Chunk` (immutable stored): `text`, `metadata`, `chunk_id`
+- `ScoredChunk` (ephemeral retrieval result): wraps a `Chunk` + `score`, with pass-through properties for ergonomic access
+
+This changed the signature of `retrieve()`, `mmr_rerank()`, `ContextAssembler.assemble()`, and the `RetrievalCache` wrapper. All 88 existing tests continued to pass after the refactor, plus 3 new ones.
+
+**Bug 3: Intel Mac stuck on torch 2.2.2.**
+Sentence-transformers 5.x requires torch ≥2.4. PyTorch stopped shipping Intel Mac wheels after 2.2.2, so `SentenceTransformerEmbeddingFunction` could not load. Eval fell back to keyword scoring, ChromaDB never saw real embeddings.
+
+Fix: try `SentenceTransformerEmbeddingFunction`, catch the exception, fall back to ChromaDB's `DefaultEmbeddingFunction` (ONNX Runtime-backed `all-MiniLM-L6-v2` — same model, no torch dependency). First install downloads a ~90MB ONNX model; subsequent runs are fast.
+
+### Design additions (borrowed from DeepTutor)
+
+After comparing our design to DeepTutor's `Chunk` / `Document` shape, we added:
+
+**`ChunkType` enum** + `chunk_type` key in `ChunkMetadata` TypedDict.
+Semantic labels (`text`, `definition`, `theorem`, `equation`, `figure`, `table`, `code`) that enable content-aware retrieval — "pull only equations for this question". Not enforced at storage; retrievers are free to filter. `Chunk.chunk_type` property defaults to `"text"` when unset.
+
+**`Document` frozen dataclass.**
+Keeps raw `text` alongside `chunks: Tuple[Chunk, ...]`. Enables three things our previous shape could not: (1) citation with surrounding paragraph, (2) re-chunking without re-fetching the source, (3) debugging "why did this chunk split weirdly?" by reading the neighbourhood.
+
+**`RAGPipeline.ingest_document(doc)`** returns a new Document with `chunks` populated via `doc.with_chunks(chunks)` (immutable replacement using `dataclasses.replace`).
+
+### Test count
+
+Went from **88 → 91 passing**. The 3 new tests cover: `chunk_type` default, `chunk_type` propagation through ingest, and `ingest_document` returning a populated-but-immutable Document.
+
+### Switching providers mid-session
+
+Originally the agent targeted `claude-opus-4-6`. First real call hit `BadRequestError: Your credit balance is too low to access the Anthropic API` — the user had an API key but no loaded credits. After a brief detour, we migrated the agent + eval to Google Gemini via the `google-genai` SDK. The Python 3.8 venv (`list/`) could not install the modern `google-genai` package, so we created a fresh Python 3.11 venv at `.venv/` and reinstalled the test dependencies.
+
+Gemini 2.5 Flash's free-tier daily limit (20 requests/day) was then exhausted in two eval runs; we downgraded the default model to Flash-Lite (~1000/day).
+
+### Retry: Python vs cats-effect
+
+Added `call_with_retry(fn, *, max_attempts, base_delay, max_delay)` in `evals/agent.py` — exponential backoff with jitter, retries on `{429, 500, 502, 503, 504}`. About 20 lines.
+
+Compared to cats-effect / cats-retry: Scala composes retry policies as values (`limitRetries[IO](5) |+| fullJitter[IO](1.second).capDelay(30.seconds)`). Testable via `TestControl`. Cancellation-safe by construction. The ergonomic gap is small for a single retry loop but meaningful when combined with timeouts, concurrency, and supervision. Filed as a learning exercise for the `scala-harness/`.
+
+### Commit summary (this session)
+
+| Commit | Description |
+|---|---|
+| _(this session)_ | Chunk/ScoredChunk split + Document + ChunkType + ONNX fallback + doc_id metadata fix |
+| _(this session)_ | Evaluation framework: corpus, questions, RAG eval, Gemini agent, LLM-as-judge eval |
+
+### Takeaways
+
+- The `context_harness/` library built in sessions 1–2 was structurally fine but had two real design smells (dual-purpose `score`, attribute-vs-metadata duplication) that only surfaced under the first real-world use. Tests caught none of them. Evals did, immediately.
+- The jump from "library with tests" to "agent with evals" produced more learning in one session than all library code combined. The feedback loop matters more than the code quality.
+- Infrastructure debt (Intel Mac torch, Python 3.8 venv, credit-gated API) ate ~30% of the session. Worth accepting as the cost of a real build-out, not avoiding.

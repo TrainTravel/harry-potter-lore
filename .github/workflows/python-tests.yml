@@ -43,24 +43,15 @@ jobs:
           key: pip-${{ matrix.python-version }}-${{ hashFiles('requirements.txt') }}
           restore-keys: pip-${{ matrix.python-version }}-
 
-      # Cache the chromadb ONNX embedding model (~25 MB download on first use).
-      # Keyed on the chromadb version so a version bump invalidates the cache.
-      - name: Cache chromadb ONNX model
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/chroma
-          key: chroma-model-${{ hashFiles('requirements.txt') }}
-
-      # Install the full requirements.txt — all packages have pre-built binary
-      # wheels for ubuntu-latest (onnxruntime, chroma-hnswlib, etc.) and the
-      # pip cache makes subsequent runs fast.
-      # pytest and pytest-asyncio are not in requirements.txt, so install them
-      # alongside.
-      - name: Install dependencies
+      # chromadb is required: tests/test_chromadb_integration.py runs a real
+      # ingest→embed→retrieve path against an EphemeralClient, and several
+      # other tests instantiate RAGPipeline which imports chromadb at init.
+      # onnxruntime ships with chromadb and powers DefaultEmbeddingFunction
+      # (no torch required — matches the Intel-Mac ONNX fallback path).
+      - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-asyncio
+          pip install pytest pytest-asyncio chromadb==0.5.23
 
       - name: Run tests
         run: python -m pytest tests/ -v --tb=short

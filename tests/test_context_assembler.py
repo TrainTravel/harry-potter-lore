@@ -1,20 +1,21 @@
 """Tests for context_harness/context_assembler.py"""
+import uuid
 import pytest
 from context_harness.context_assembler import ContextAssembler, AssemblyStrategy, _jaccard
-from context_harness.rag_pipeline import Chunk
+from context_harness.rag_pipeline import Chunk, ScoredChunk
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def make_chunk(text: str, score: float = 0.5, doc_id: str = "hp1") -> Chunk:
-    return Chunk(chunkId := __import__("uuid").uuid4().hex, doc_id, text, score)
-
-
-def make_chunk(text: str, score: float = 0.5, doc_id: str = "hp1") -> Chunk:
-    import uuid
-    return Chunk(chunk_id=str(uuid.uuid4()), doc_id=doc_id, text=text, score=score)
+def make_chunk(text: str, score: float = 0.5, doc_id: str = "hp1") -> ScoredChunk:
+    chunk = Chunk(
+        text=text,
+        metadata={"doc_id": doc_id},
+        chunk_id=str(uuid.uuid4()),
+    )
+    return ScoredChunk(chunk=chunk, score=score)
 
 
 # ---------------------------------------------------------------------------

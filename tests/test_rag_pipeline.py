@@ -1,7 +1,7 @@
 """Tests for context_harness/rag_pipeline.py"""
 import pytest
 from context_harness.rag_pipeline import (
-    RAGPipeline, Chunk, ChunkingStrategy,
+    RAGPipeline, Chunk, ScoredChunk, Document, ChunkingStrategy, ChunkType,
     _fixed_chunk, _sentence_chunk, _paragraph_chunk, _recursive_chunk,
 )
 
@@ -76,12 +76,16 @@ def test_pipeline_count_after_ingest(pipeline):
     assert pipeline.count() >= 1
 
 
-def test_pipeline_retrieve_returns_chunks(pipeline):
+def test_pipeline_retrieve_returns_scored_chunks(pipeline):
     pipeline.ingest("Dumbledore is the greatest wizard of his age.", doc_id="hp1")
     pipeline.ingest("Harry Potter survived the killing curse.", doc_id="hp2")
     results = pipeline.retrieve("Dumbledore wizard")
     assert len(results) >= 1
-    assert all(isinstance(c, Chunk) for c in results)
+    # Retrieval yields ScoredChunks, each wrapping a stored Chunk
+    assert all(isinstance(c, ScoredChunk) for c in results)
+    assert all(isinstance(c.chunk, Chunk) for c in results)
+    # Property pass-throughs still expose .doc_id / .text / .score ergonomically
+    assert all(c.doc_id in {"hp1", "hp2"} for c in results)
 
 
 def test_pipeline_retrieve_scores_are_nonnegative(pipeline):
@@ -107,6 +111,34 @@ def test_chunk_ids_are_unique(pipeline):
     chunks = pipeline.ingest("One.\n\nTwo.\n\nThree.", doc_id="hp1")
     ids = [c.chunk_id for c in chunks]
     assert len(ids) == len(set(ids))
+
+
+def test_chunk_type_defaults_to_text(pipeline):
+    chunks = pipeline.ingest("hello world", doc_id="d1")
+    assert all(c.chunk_type == ChunkType.TEXT.value for c in chunks)
+
+
+def test_chunk_type_propagates(pipeline):
+    chunks = pipeline.ingest(
+        "E = mc^2", doc_id="physics", chunk_type=ChunkType.EQUATION.value
+    )
+    assert all(c.chunk_type == "equation" for c in chunks)
+    # Stored in metadata, not a separate attribute
+    assert all(c.metadata["chunk_type"] == "equation" for c in chunks)
+
+
+def test_ingest_document_returns_populated_document(pipeline):
+    doc = Document(doc_id="hp1", text="Dumbledore.\n\nSnape.", metadata={"title": "notes"})
+    result = pipeline.ingest_document(doc)
+    # Original doc is unchanged (immutable)
+    assert doc.chunks == ()
+    # New Document carries the chunks and retains the source text
+    assert len(result.chunks) >= 1
+    assert result.text == doc.text
+    assert result.doc_id == "hp1"
+    assert result.metadata["title"] == "notes"
+    # Chunks carry the doc_id via metadata
+    assert all(c.doc_id == "hp1" for c in result.chunks)
 
 
 def test_mmr_rerank_without_embeddings(pipeline):

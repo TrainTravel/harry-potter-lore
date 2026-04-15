@@ -6,5 +6,10 @@ __pycache__/
 dist/
 build/
 .env
-data/*.db
-data/chromadb/
+data/
+# Virtualenvs
+.venv/
+venv/
+list/
+# Eval artifacts
+evals/results.json
