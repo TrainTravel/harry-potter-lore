@@ -177,6 +177,18 @@ class TraceStore:
                 PRIMARY KEY (turn_id, seq)
             )
         """)
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS snapshots (
+                id          INTEGER PRIMARY KEY,
+                name        VARCHAR NOT NULL UNIQUE,
+                created_at  DOUBLE NOT NULL,
+                max_event_ts DOUBLE NOT NULL,
+                description VARCHAR DEFAULT ''
+            )
+        """)
+        self._conn.execute("""
+            CREATE SEQUENCE IF NOT EXISTS snapshot_seq START 1
+        """)
 
     async def save(self, evt: TraceEvent) -> None:
         async with self._lock:
@@ -213,6 +225,99 @@ class TraceStore:
             {"turn_id": r[0], "event_count": r[1], "wall_s": round(r[2], 3), "error_count": r[3]}
             for r in rows
         ]
+
+    # ------------------------------------------------------------------
+    # Time-travel: snapshots
+    # ------------------------------------------------------------------
+
+    def create_snapshot(self, name: str, description: str = "") -> dict:
+        """Create a named checkpoint of the current trace state."""
+        max_ts = self._conn.execute(
+            "SELECT COALESCE(MAX(ts), 0) FROM trace_events"
+        ).fetchone()[0]
+        snap_id = self._conn.execute("SELECT nextval('snapshot_seq')").fetchone()[0]
+        now = time.time()
+        self._conn.execute(
+            "INSERT INTO snapshots (id, name, created_at, max_event_ts, description) VALUES (?,?,?,?,?)",
+            (snap_id, name, now, max_ts, description),
+        )
+        return {"id": snap_id, "name": name, "created_at": now, "max_event_ts": max_ts}
+
+    def list_snapshots(self) -> List[dict]:
+        rows = self._conn.execute(
+            "SELECT id, name, created_at, max_event_ts, description FROM snapshots ORDER BY created_at DESC"
+        ).fetchall()
+        return [
+            {"id": r[0], "name": r[1], "created_at": r[2], "max_event_ts": r[3], "description": r[4]}
+            for r in rows
+        ]
+
+    def get_turn_at(self, turn_id: str, snapshot_name: str) -> List[dict]:
+        """Time-travel: get a turn's events as they existed at a snapshot."""
+        snap = self._conn.execute(
+            "SELECT max_event_ts FROM snapshots WHERE name = ?", (snapshot_name,)
+        ).fetchone()
+        if snap is None:
+            raise ValueError(f"Snapshot {snapshot_name!r} not found")
+        rows = self._conn.execute(
+            "SELECT seq, kind, payload, ts, latency_ms FROM trace_events "
+            "WHERE turn_id = ? AND ts <= ? ORDER BY seq",
+            (turn_id, snap[0]),
+        ).fetchall()
+        return [
+            {"seq": s, "kind": k, "payload": json.loads(p) if p else {}, "ts": t, "latency_ms": lm}
+            for s, k, p, t, lm in rows
+        ]
+
+    def list_turns_at(self, snapshot_name: str, limit: int = 20) -> List[dict]:
+        """Time-travel: list turns that existed at a snapshot."""
+        snap = self._conn.execute(
+            "SELECT max_event_ts FROM snapshots WHERE name = ?", (snapshot_name,)
+        ).fetchone()
+        if snap is None:
+            raise ValueError(f"Snapshot {snapshot_name!r} not found")
+        rows = self._conn.execute("""
+            SELECT turn_id,
+                   COUNT(*)              AS event_count,
+                   MAX(ts) - MIN(ts)     AS wall_s,
+                   COUNT(*) FILTER (WHERE kind = 'error') AS error_count
+            FROM trace_events
+            WHERE ts <= ?
+            GROUP BY turn_id
+            ORDER BY MIN(ts) DESC
+            LIMIT ?
+        """, (snap[0], limit)).fetchall()
+        return [
+            {"turn_id": r[0], "event_count": r[1], "wall_s": round(r[2], 3), "error_count": r[3]}
+            for r in rows
+        ]
+
+    def diff_snapshots(self, snap_a: str, snap_b: str) -> dict:
+        """What changed between two snapshots."""
+        ts_a = self._conn.execute(
+            "SELECT max_event_ts FROM snapshots WHERE name = ?", (snap_a,)
+        ).fetchone()
+        ts_b = self._conn.execute(
+            "SELECT max_event_ts FROM snapshots WHERE name = ?", (snap_b,)
+        ).fetchone()
+        if ts_a is None or ts_b is None:
+            raise ValueError(f"Snapshot not found: {snap_a if ts_a is None else snap_b}")
+        lo, hi = sorted([ts_a[0], ts_b[0]])
+        rows = self._conn.execute("""
+            SELECT turn_id, COUNT(*) AS new_events,
+                   COUNT(*) FILTER (WHERE kind = 'error') AS errors
+            FROM trace_events
+            WHERE ts > ? AND ts <= ?
+            GROUP BY turn_id
+            ORDER BY MIN(ts)
+        """, (lo, hi)).fetchall()
+        return {
+            "from": snap_a, "to": snap_b,
+            "new_turns": len(rows),
+            "new_events": sum(r[1] for r in rows),
+            "new_errors": sum(r[2] for r in rows),
+            "turns": [{"turn_id": r[0], "events": r[1], "errors": r[2]} for r in rows],
+        }
 
     def latency_by_kind(self, since_hours: float = 24) -> List[dict]:
         """p50/p95 latency per event kind over a time window — the analytics payoff."""
