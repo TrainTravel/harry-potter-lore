@@ -103,6 +103,33 @@ def socratic_score(example, pred, trace=None) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Exam Grader — grading accuracy
+# ---------------------------------------------------------------------------
+
+def exam_grader_metric(example, pred, trace=None) -> bool:
+    """
+    True when:
+      1. The predicted score is within 15 points of the expected score
+      2. is_passing agrees with the expected value
+      3. critique is non-trivial (>20 chars)
+    """
+    expected_score = int(getattr(example, "expected_score", 0))
+    expected_passing = getattr(example, "expected_passing", None)
+
+    pred_score = int(getattr(pred, "score", 0))
+    pred_passing = getattr(pred, "is_passing", None)
+    critique = getattr(pred, "critique", "") or ""
+
+    if abs(pred_score - expected_score) > 15:
+        return False
+    if expected_passing is not None and bool(pred_passing) != bool(expected_passing):
+        return False
+    if len(critique) < 20:
+        return False
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
