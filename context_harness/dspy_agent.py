@@ -129,6 +129,20 @@ class GuidedLearningSignature(dspy.Signature):
     explanation:   str = dspy.OutputField(desc="concept explanation without revealing the direct answer")
 
 
+class DebateSignature(dspy.Signature):
+    """Present both sides of a lore debate with canon evidence.
+    Argue for and against the position, then deliver a verdict on which side
+    the canon supports more strongly."""
+
+    position: str = dspy.InputField(desc="the debatable claim or position about HP lore")
+    context:  str = dspy.InputField(desc="retrieved lore passages, each prefixed [doc_id]")
+
+    arguments_for:     str = dspy.OutputField(desc="canon-supported arguments in favour of the position")
+    arguments_against: str = dspy.OutputField(desc="canon-supported arguments against the position")
+    verdict:           str = dspy.OutputField(desc="which side the canon evidence supports more strongly, and why")
+    citations:         str = dspy.OutputField(desc="space-separated doc_ids used across both sides of the argument")
+
+
 # ---------------------------------------------------------------------------
 # Modules
 # ---------------------------------------------------------------------------
@@ -233,11 +247,30 @@ class GuidedLearningModule(dspy.Module):
         return self.predict(question=question, context=context, past_attempts=past_attempts)
 
 
+class DebateModule(dspy.Module):
+    """
+    Balanced retrieval (k=7) + ChainOfThought over DebateSignature.
+    Optimizer metric: both sides must cite distinct canon passages; verdict
+    must not be empty and must reference at least one doc_id.
+    """
+
+    def __init__(self, pipeline: RAGPipeline, k: int = 7) -> None:
+        super().__init__()
+        self._pipeline = pipeline
+        self._k = k
+        self.predict = dspy.ChainOfThought(DebateSignature)
+
+    def forward(self, question: str, user_profile: Optional[Dict[str, Any]] = None) -> dspy.Prediction:
+        chunks = self._pipeline.retrieve(question, top_k=self._k)
+        context = "\n\n".join(f"[{c.doc_id}] {c.text}" for c in chunks) or "No context retrieved."
+        return self.predict(position=question, context=context)
+
+
 # ---------------------------------------------------------------------------
 # Agent — mode router
 # ---------------------------------------------------------------------------
 
-MODES = {"deep_research", "guided_learning", "exam_grader", "open_analysis", "perspective_shift"}
+MODES = {"deep_research", "guided_learning", "exam_grader", "open_analysis", "perspective_shift", "debate"}
 
 
 class DSPyAgent:
@@ -266,6 +299,7 @@ class DSPyAgent:
             "exam_grader":     ExamGraderModule(pipeline, k=5),
             "open_analysis":   OpenAnalysisModule(pipeline, k=7),
             "perspective_shift": PerspectiveShiftModule(pipeline, k=5),
+            "debate":          DebateModule(pipeline, k=7),
         }
         if export_dir:
             self._load(Path(export_dir))
@@ -325,6 +359,12 @@ class DSPyAgent:
         """Run the optimizer on the exam_grader module and update in place."""
         self._modules["exam_grader"] = optimizer.compile(
             self._modules["exam_grader"], trainset=trainset
+        )
+
+    def compile_debate(self, optimizer: dspy.teleprompt.Teleprompter, trainset: list) -> None:
+        """Run the optimizer on the debate module and update in place."""
+        self._modules["debate"] = optimizer.compile(
+            self._modules["debate"], trainset=trainset
         )
 
 

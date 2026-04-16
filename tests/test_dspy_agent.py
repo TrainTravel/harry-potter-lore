@@ -6,8 +6,8 @@ import dspy
 from dspy.utils import DummyLM
 
 from context_harness.dspy_agent import (
-    DeepResearchSignature, GuidedLearningSignature,
-    DeepResearchModule, GuidedLearningModule,
+    DeepResearchSignature, GuidedLearningSignature, DebateSignature,
+    DeepResearchModule, GuidedLearningModule, DebateModule,
     DSPyAgent, BackfillRequired,
     _write_manifest, _validate_manifest, MODES,
 )
@@ -76,6 +76,20 @@ def test_guided_learning_signature_output_fields():
     assert "hint" in fields
     assert "next_question" in fields
     assert "explanation" in fields
+
+
+def test_debate_signature_input_fields():
+    fields = DebateSignature.input_fields
+    assert "position" in fields
+    assert "context" in fields
+
+
+def test_debate_signature_output_fields():
+    fields = DebateSignature.output_fields
+    assert "arguments_for" in fields
+    assert "arguments_against" in fields
+    assert "verdict" in fields
+    assert "citations" in fields
 
 
 # ---------------------------------------------------------------------------
@@ -196,6 +210,7 @@ def test_agent_raises_on_unknown_mode(pipeline):
 def test_agent_modes_constant():
     assert "deep_research" in MODES
     assert "guided_learning" in MODES
+    assert "debate" in MODES
 
 
 # ---------------------------------------------------------------------------

@@ -182,6 +182,53 @@ def exam_grader_metric(example, pred, trace=None) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Debate — balanced argument quality
+# ---------------------------------------------------------------------------
+
+def debate_metric(example, pred, trace=None) -> bool:
+    """
+    True when all of:
+      1. arguments_for is non-empty (≥ 20 chars)
+      2. arguments_against is non-empty (≥ 20 chars)
+      3. verdict is non-empty (≥ 10 chars)
+      4. At least one expected citation appears in the prediction
+    """
+    args_for     = (getattr(pred, "arguments_for",     "") or "").strip()
+    args_against = (getattr(pred, "arguments_against", "") or "").strip()
+    verdict      = (getattr(pred, "verdict",           "") or "").strip()
+    citations    = (getattr(pred, "citations",         "") or "")
+
+    if len(args_for)     < 20: return False
+    if len(args_against) < 20: return False
+    if len(verdict)      < 10: return False
+
+    expected = _tokens(getattr(example, "citations", ""))
+    if expected and not (expected & _tokens(citations)):
+        return False
+
+    return True
+
+
+def debate_score(example, pred, trace=None) -> float:
+    """Continuous variant — 0.0 → 1.0 for optimizer ranking."""
+    score = 0.0
+    args_for     = (getattr(pred, "arguments_for",     "") or "").strip()
+    args_against = (getattr(pred, "arguments_against", "") or "").strip()
+    verdict      = (getattr(pred, "verdict",           "") or "").strip()
+    citations    = _tokens(getattr(pred, "citations",  ""))
+
+    if len(args_for)     >= 20: score += 0.3
+    if len(args_against) >= 20: score += 0.3
+    if len(verdict)      >= 10: score += 0.2
+
+    expected = _tokens(getattr(example, "citations", ""))
+    if expected and expected & citations:
+        score += 0.2
+
+    return score
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 

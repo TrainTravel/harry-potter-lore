@@ -6,6 +6,7 @@ import pytest
 from context_harness.metrics import (
     deep_research_metric, deep_research_strict_metric,
     socratic_metric, socratic_score,
+    debate_metric, debate_score,
 )
 
 
@@ -154,3 +155,91 @@ def test_socratic_score_rewards_quality():
         explanation="the answer is that it holds a piece of soul",
     )
     assert socratic_score(None, good) > socratic_score(None, bad)
+
+
+# ---------------------------------------------------------------------------
+# Debate trainset integrity
+# ---------------------------------------------------------------------------
+
+def test_debate_trainset_nonempty():
+    from data.trainset_debate import TRAINSET
+    assert len(TRAINSET) >= 10
+
+
+def test_debate_trainset_citations_reference_valid_docs():
+    from data.trainset_debate import TRAINSET, EVALSET
+    for ex in TRAINSET + EVALSET:
+        for cite in ex.citations.split():
+            assert cite in VALID_DOC_IDS, (
+                f"unknown citation {cite!r} in position: {ex.position!r}"
+            )
+
+
+def test_debate_examples_mark_position_as_input():
+    from data.trainset_debate import TRAINSET
+    for ex in TRAINSET:
+        assert "position" in ex.inputs().keys()
+
+
+# ---------------------------------------------------------------------------
+# debate_metric
+# ---------------------------------------------------------------------------
+
+def test_debate_metric_passes_on_good_prediction():
+    ex = SimpleNamespace(citations="severus-snape harry-potter")
+    pred = SimpleNamespace(
+        arguments_for="Snape risked his life as a double agent throughout the war.",
+        arguments_against="Snape bullied students for years and acted from self-interest.",
+        verdict="The canon supports his heroism more strongly, given the sacrifices made.",
+        citations="severus-snape harry-potter albus-dumbledore",
+    )
+    assert debate_metric(ex, pred) is True
+
+
+def test_debate_metric_fails_when_arguments_for_is_empty():
+    ex = SimpleNamespace(citations="severus-snape")
+    pred = SimpleNamespace(
+        arguments_for="Short.",
+        arguments_against="Snape was cruel to students throughout his tenure at Hogwarts.",
+        verdict="The evidence is mixed but leans against.",
+        citations="severus-snape",
+    )
+    assert debate_metric(ex, pred) is False
+
+
+def test_debate_metric_fails_when_no_citation_overlap():
+    ex = SimpleNamespace(citations="severus-snape harry-potter")
+    pred = SimpleNamespace(
+        arguments_for="Snape risked his life as a double agent throughout the war.",
+        arguments_against="Snape bullied students for years and acted from self-interest.",
+        verdict="The canon supports his heroism more strongly.",
+        citations="hogwarts",  # no overlap with expected
+    )
+    assert debate_metric(ex, pred) is False
+
+
+def test_debate_metric_passes_when_no_expected_citations():
+    ex = SimpleNamespace(citations="")
+    pred = SimpleNamespace(
+        arguments_for="There are valid arguments in favour of this position.",
+        arguments_against="There are also strong arguments against this position.",
+        verdict="The evidence is balanced overall.",
+        citations="anything",
+    )
+    assert debate_metric(ex, pred) is True
+
+
+def test_debate_score_rewards_quality():
+    good = SimpleNamespace(
+        arguments_for="Snape risked everything as a double agent to protect Harry and the Order.",
+        arguments_against="Snape bullied students systematically and prioritised personal obsession.",
+        verdict="The weight of canon evidence supports Snape as ultimately heroic.",
+        citations="severus-snape harry-potter",
+    )
+    bad = SimpleNamespace(
+        arguments_for="ok",
+        arguments_against="nope",
+        verdict="",
+        citations="",
+    )
+    assert debate_score(None, good) > debate_score(None, bad)

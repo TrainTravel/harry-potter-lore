@@ -26,7 +26,7 @@ from dspy.teleprompt import BootstrapFewShot
 
 from .ingest_lore import build_pipeline
 from .dspy_agent import DSPyAgent
-from .metrics import deep_research_metric, socratic_metric, exam_grader_metric
+from .metrics import deep_research_metric, socratic_metric, exam_grader_metric, debate_metric
 
 
 def main() -> int:
@@ -49,6 +49,7 @@ def main() -> int:
     from data.trainset_deep_research import TRAINSET as research_trainset
     from data.trainset_guided_learning import TRAINSET as learning_trainset
     from data.trainset_exam_grader import TRAINSET as grader_trainset
+    from data.trainset_debate import TRAINSET as debate_trainset
 
     print("Building ChromaDB-backed pipeline...")
     pipeline = build_pipeline(persist=True)
@@ -56,7 +57,7 @@ def main() -> int:
     agent = DSPyAgent(pipeline)
 
     # ----- Compile deep_research -----
-    print(f"\n[1/3] Compiling deep_research ({len(research_trainset)} examples)...")
+    print(f"\n[1/4] Compiling deep_research ({len(research_trainset)} examples)...")
     research_optimizer = BootstrapFewShot(
         metric=deep_research_metric,
         max_bootstrapped_demos=args.max_demos,
@@ -66,7 +67,7 @@ def main() -> int:
     print("  ✓ deep_research compiled")
 
     # ----- Compile guided_learning -----
-    print(f"\n[2/3] Compiling guided_learning ({len(learning_trainset)} examples)...")
+    print(f"\n[2/4] Compiling guided_learning ({len(learning_trainset)} examples)...")
     learning_optimizer = BootstrapFewShot(
         metric=socratic_metric,
         max_bootstrapped_demos=args.max_demos,
@@ -76,7 +77,7 @@ def main() -> int:
     print("  ✓ guided_learning compiled")
 
     # ----- Compile exam_grader -----
-    print(f"\n[3/3] Compiling exam_grader ({len(grader_trainset)} examples)...")
+    print(f"\n[3/4] Compiling exam_grader ({len(grader_trainset)} examples)...")
     grader_optimizer = BootstrapFewShot(
         metric=exam_grader_metric,
         max_bootstrapped_demos=args.max_demos,
@@ -85,12 +86,23 @@ def main() -> int:
     agent.compile_exam_grader(grader_optimizer, trainset=grader_trainset)
     print("  ✓ exam_grader compiled")
 
+    # ----- Compile debate -----
+    print(f"\n[4/4] Compiling debate ({len(debate_trainset)} examples)...")
+    debate_optimizer = BootstrapFewShot(
+        metric=debate_metric,
+        max_bootstrapped_demos=args.max_demos,
+        max_labeled_demos=args.max_labeled,
+    )
+    agent.compile_debate(debate_optimizer, trainset=debate_trainset)
+    print("  ✓ debate compiled")
+
     # ----- Save -----
     print(f"\nSaving compiled agent to {args.out}/ ...")
     agent.save(args.out)
     print("  ✓ deep_research.json")
     print("  ✓ guided_learning.json")
     print("  ✓ exam_grader.json")
+    print("  ✓ debate.json")
     print("  ✓ manifest.json")
     print("\nDone.")
     return 0
