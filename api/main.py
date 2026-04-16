@@ -93,7 +93,8 @@ def _record(turn_id: str, name: str, attrs: dict[str, Any] | None = None) -> Non
 
 class AskRequest(BaseModel):
     question: str
-    mode: str = Field(default="deep_research", pattern="^(deep_research|guided_learning|exam_grader|open_analysis)$")
+    mode: str = Field(default="deep_research", pattern="^(deep_research|guided_learning|exam_grader|open_analysis|perspective_shift)$")
+    character: str = Field(default="Dumbledore", description="HP character for perspective_shift mode")
     collection_name: str = "hp_lore"
     provider: str = "gemini"
     api_key: str | None = None
@@ -241,7 +242,7 @@ def ask(req: AskRequest) -> AskResponse:
     _record(turn_id, "turn.start", {"question": req.question, "mode": req.mode})
 
     t_retrieve = time.perf_counter()
-    k = {"deep_research": 10, "open_analysis": 7, "exam_grader": 5}.get(req.mode, 3)
+    k = {"deep_research": 10, "open_analysis": 7, "perspective_shift": 5, "exam_grader": 5}.get(req.mode, 3)
     chunks = pipeline.retrieve(req.question, top_k=k)
     _record(turn_id, "retrieve.done", {
         "n_chunks": len(chunks),
@@ -254,14 +255,23 @@ def ask(req: AskRequest) -> AskResponse:
     lm = dspy.LM(model_name, api_key=api_key)
 
     t_llm = time.perf_counter()
+    kwargs = {}
+    if req.mode == "exam_grader":
+        kwargs["student_answer"] = req.student_answer
+    elif req.mode == "perspective_shift":
+        kwargs["character"] = req.character
     with dspy.context(lm=lm):
-        pred = agent.forward(req.mode, req.question)
+        pred = agent.forward(req.mode, req.question, **kwargs)
     llm_ms = (time.perf_counter() - t_llm) * 1000
     _record(turn_id, "llm.done", {"latency_ms": llm_ms})
 
-    # Extract answer per mode; both signatures produce .answer or .hint/.explanation
     if req.mode == "deep_research":
         answer = getattr(pred, "answer", "")
+    elif req.mode == "perspective_shift":
+        principle = getattr(pred, "character_principle", "")
+        insight = getattr(pred, "applied_insight", "")
+        reasoning = getattr(pred, "reasoning", "")
+        answer = f"**{req.character}'s Principle:** {principle}\n\n**Applied to your situation:** {insight}\n\n**Why this maps:** {reasoning}"
     elif req.mode == "open_analysis":
         analysis = getattr(pred, "analysis", "")
         corpus_facts = getattr(pred, "corpus_facts", "")

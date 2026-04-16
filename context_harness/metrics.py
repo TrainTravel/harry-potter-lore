@@ -103,6 +103,34 @@ def socratic_score(example, pred, trace=None) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Perspective Shift — character principle applied to real world
+# ---------------------------------------------------------------------------
+
+def perspective_shift_metric(example, pred, trace=None) -> bool:
+    """
+    True when:
+      1. character_principle is grounded (mentions specific events, not generic)
+      2. applied_insight is actionable (>80 chars, not just "be brave")
+      3. reasoning bridges character to scenario (>50 chars)
+      4. citations present (character grounded in corpus)
+    """
+    principle = getattr(pred, "character_principle", "") or ""
+    insight = getattr(pred, "applied_insight", "") or ""
+    reasoning = getattr(pred, "reasoning", "") or ""
+    citations = getattr(pred, "citations", "") or ""
+
+    if len(principle) < 50:
+        return False
+    if len(insight) < 80:
+        return False
+    if len(reasoning) < 50:
+        return False
+    if not citations or citations.strip() == "none":
+        return False
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Open Analysis — quality of analytical response
 # ---------------------------------------------------------------------------
 

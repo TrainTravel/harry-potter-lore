@@ -69,6 +69,23 @@ class DeepResearchSignature(dspy.Signature):
     gaps:       str = dspy.OutputField(desc="aspects the context does not cover, or 'none'")
 
 
+class PerspectiveShiftSignature(dspy.Signature):
+    """Extract a principle, philosophy, or behavioral pattern from a Harry Potter
+    character based on the retrieved lore, then apply it to a real-world situation
+    the user describes. Ground the character's traits in corpus facts, then reason
+    about how those traits translate to practical advice or insight. Be specific
+    and actionable — not generic motivational advice."""
+
+    character: str = dspy.InputField(desc="the HP character whose perspective to apply")
+    scenario:  str = dspy.InputField(desc="the real-world situation or question")
+    context:   str = dspy.InputField(desc="retrieved lore about this character, each prefixed [doc_id]")
+
+    character_principle: str = dspy.OutputField(desc="the core principle or philosophy this character embodies, grounded in specific canon events")
+    applied_insight:     str = dspy.OutputField(desc="how this principle applies to the user's real-world scenario — specific, actionable, not generic")
+    reasoning:           str = dspy.OutputField(desc="the bridge: why this character's experience maps to this situation")
+    citations:           str = dspy.OutputField(desc="space-separated doc_ids used for character grounding")
+
+
 class OpenAnalysisSignature(dspy.Signature):
     """Analytical mode: use retrieved lore as a factual foundation, then draw on
     your broader knowledge (psychology, literary theory, history, philosophy) to
@@ -132,6 +149,25 @@ class DeepResearchModule(dspy.Module):
         chunks = self._pipeline.retrieve(question, top_k=self._k)
         context = "\n\n".join(f"[{c.doc_id}] {c.text}" for c in chunks) or "No context retrieved."
         return self.predict(question=question, context=context)
+
+
+class PerspectiveShiftModule(dspy.Module):
+    """
+    Retrieves lore about a specific character (k=5), then applies their
+    philosophy to a real-world scenario via ChainOfThought.
+    """
+
+    def __init__(self, pipeline: RAGPipeline, k: int = 5) -> None:
+        super().__init__()
+        self._pipeline = pipeline
+        self._k = k
+        self.predict = dspy.ChainOfThought(PerspectiveShiftSignature)
+
+    def forward(self, question: str, character: str = "Dumbledore", **kwargs) -> dspy.Prediction:
+        query = f"{character} {question}".strip()
+        chunks = self._pipeline.retrieve(query, top_k=self._k)
+        context = "\n\n".join(f"[{c.doc_id}] {c.text}" for c in chunks) or "No context retrieved."
+        return self.predict(character=character, scenario=question, context=context)
 
 
 class OpenAnalysisModule(dspy.Module):
@@ -201,7 +237,7 @@ class GuidedLearningModule(dspy.Module):
 # Agent — mode router
 # ---------------------------------------------------------------------------
 
-MODES = {"deep_research", "guided_learning", "exam_grader", "open_analysis"}
+MODES = {"deep_research", "guided_learning", "exam_grader", "open_analysis", "perspective_shift"}
 
 
 class DSPyAgent:
@@ -229,6 +265,7 @@ class DSPyAgent:
             "guided_learning": GuidedLearningModule(pipeline, k=learning_k),
             "exam_grader":     ExamGraderModule(pipeline, k=5),
             "open_analysis":   OpenAnalysisModule(pipeline, k=7),
+            "perspective_shift": PerspectiveShiftModule(pipeline, k=5),
         }
         if export_dir:
             self._load(Path(export_dir))
