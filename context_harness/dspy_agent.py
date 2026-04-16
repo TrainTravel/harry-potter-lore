@@ -69,6 +69,20 @@ class DeepResearchSignature(dspy.Signature):
     gaps:       str = dspy.OutputField(desc="aspects the context does not cover, or 'none'")
 
 
+class ExamGraderSignature(dspy.Signature):
+    """Grade a student's answer strictly against the retrieved textbook data.
+    Deduct points for claims not supported by the context. Be specific in critique."""
+
+    question:       str = dspy.InputField(desc="the exam question")
+    student_answer: str = dspy.InputField(desc="the student's submitted answer")
+    context:        str = dspy.InputField(desc="authoritative textbook passages, each prefixed [doc_id]")
+
+    score:      int  = dspy.OutputField(desc="0-100, strictly based on context accuracy")
+    is_passing: bool = dspy.OutputField(desc="true if score >= 60")
+    critique:   str  = dspy.OutputField(desc="specific errors or omissions in the student's answer")
+    citations:  str  = dspy.OutputField(desc="space-separated doc_ids used for grading")
+
+
 class GuidedLearningSignature(dspy.Signature):
     """Socratic tutor. Guide the learner without revealing the answer directly.
     Use their past attempts to personalise the hint."""
@@ -104,6 +118,25 @@ class DeepResearchModule(dspy.Module):
         return self.predict(question=question, context=context)
 
 
+class ExamGraderModule(dspy.Module):
+    """
+    Strict grading: retrieve authoritative chunks (k=5), grade the student's
+    answer against them. The optimizer metric penalises lenient grading of
+    wrong answers and harsh grading of correct ones.
+    """
+
+    def __init__(self, pipeline: RAGPipeline, k: int = 5) -> None:
+        super().__init__()
+        self._pipeline = pipeline
+        self._k = k
+        self.predict = dspy.ChainOfThought(ExamGraderSignature)
+
+    def forward(self, question: str, student_answer: str = "", **kwargs) -> dspy.Prediction:
+        chunks = self._pipeline.retrieve(question, top_k=self._k)
+        context = "\n\n".join(f"[{c.doc_id}] {c.text}" for c in chunks) or "No context retrieved."
+        return self.predict(question=question, student_answer=student_answer, context=context)
+
+
 class GuidedLearningModule(dspy.Module):
     """
     Narrow retrieval (k=3) biased toward past-attempt context
@@ -134,7 +167,7 @@ class GuidedLearningModule(dspy.Module):
 # Agent — mode router
 # ---------------------------------------------------------------------------
 
-MODES = {"deep_research", "guided_learning"}
+MODES = {"deep_research", "guided_learning", "exam_grader"}
 
 
 class DSPyAgent:
@@ -160,6 +193,7 @@ class DSPyAgent:
         self._modules: Dict[str, dspy.Module] = {
             "deep_research":   DeepResearchModule(pipeline, k=research_k),
             "guided_learning": GuidedLearningModule(pipeline, k=learning_k),
+            "exam_grader":     ExamGraderModule(pipeline, k=5),
         }
         if export_dir:
             self._load(Path(export_dir))
@@ -213,6 +247,12 @@ class DSPyAgent:
         """Run the optimizer on the guided_learning module and update in place."""
         self._modules["guided_learning"] = optimizer.compile(
             self._modules["guided_learning"], trainset=trainset
+        )
+
+    def compile_exam_grader(self, optimizer: dspy.teleprompt.Teleprompter, trainset: list) -> None:
+        """Run the optimizer on the exam_grader module and update in place."""
+        self._modules["exam_grader"] = optimizer.compile(
+            self._modules["exam_grader"], trainset=trainset
         )
 
 
