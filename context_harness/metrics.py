@@ -103,6 +103,30 @@ def socratic_score(example, pred, trace=None) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Open Analysis — quality of analytical response
+# ---------------------------------------------------------------------------
+
+def open_analysis_metric(example, pred, trace=None) -> bool:
+    """
+    True when:
+      1. analysis is substantial (>100 chars)
+      2. own_reasoning is non-empty (the LLM actually went beyond the corpus)
+      3. corpus_facts is non-empty (the LLM grounded in retrieved data)
+    """
+    analysis = getattr(pred, "analysis", "") or ""
+    own_reasoning = getattr(pred, "own_reasoning", "") or ""
+    corpus_facts = getattr(pred, "corpus_facts", "") or ""
+
+    if len(analysis) < 100:
+        return False
+    if len(own_reasoning) < 30:
+        return False
+    if len(corpus_facts) < 20:
+        return False
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Exam Grader — grading accuracy
 # ---------------------------------------------------------------------------
 

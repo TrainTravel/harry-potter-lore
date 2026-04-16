@@ -93,7 +93,7 @@ def _record(turn_id: str, name: str, attrs: dict[str, Any] | None = None) -> Non
 
 class AskRequest(BaseModel):
     question: str
-    mode: str = Field(default="deep_research", pattern="^(deep_research|guided_learning)$")
+    mode: str = Field(default="deep_research", pattern="^(deep_research|guided_learning|exam_grader|open_analysis)$")
     collection_name: str = "hp_lore"
     provider: str = "gemini"
     api_key: str | None = None
@@ -241,7 +241,8 @@ def ask(req: AskRequest) -> AskResponse:
     _record(turn_id, "turn.start", {"question": req.question, "mode": req.mode})
 
     t_retrieve = time.perf_counter()
-    chunks = pipeline.retrieve(req.question, top_k=10 if req.mode == "deep_research" else 3)
+    k = {"deep_research": 10, "open_analysis": 7, "exam_grader": 5}.get(req.mode, 3)
+    chunks = pipeline.retrieve(req.question, top_k=k)
     _record(turn_id, "retrieve.done", {
         "n_chunks": len(chunks),
         "latency_ms": (time.perf_counter() - t_retrieve) * 1000,
@@ -261,6 +262,16 @@ def ask(req: AskRequest) -> AskResponse:
     # Extract answer per mode; both signatures produce .answer or .hint/.explanation
     if req.mode == "deep_research":
         answer = getattr(pred, "answer", "")
+    elif req.mode == "open_analysis":
+        analysis = getattr(pred, "analysis", "")
+        corpus_facts = getattr(pred, "corpus_facts", "")
+        own_reasoning = getattr(pred, "own_reasoning", "")
+        answer = f"{analysis}\n\n**From the corpus:** {corpus_facts}\n\n**My analysis:** {own_reasoning}"
+    elif req.mode == "exam_grader":
+        score = getattr(pred, "score", 0)
+        is_passing = getattr(pred, "is_passing", False)
+        critique = getattr(pred, "critique", "")
+        answer = f"**Score:** {score}/100 ({'PASS' if is_passing else 'FAIL'})\n\n**Critique:** {critique}"
     else:
         hint = getattr(pred, "hint", "")
         explain = getattr(pred, "explanation", "")

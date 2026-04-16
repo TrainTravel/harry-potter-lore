@@ -69,6 +69,22 @@ class DeepResearchSignature(dspy.Signature):
     gaps:       str = dspy.OutputField(desc="aspects the context does not cover, or 'none'")
 
 
+class OpenAnalysisSignature(dspy.Signature):
+    """Analytical mode: use retrieved lore as a factual foundation, then draw on
+    your broader knowledge (psychology, literary theory, history, philosophy) to
+    provide deep analysis. Clearly mark which parts come from the corpus vs your
+    own reasoning. Do not refuse to answer — if the corpus is thin, lean on your
+    general knowledge and say so."""
+
+    question: str = dspy.InputField(desc="the analytical question")
+    context:  str = dspy.InputField(desc="retrieved lore passages for grounding, each prefixed [doc_id]")
+
+    analysis:       str = dspy.OutputField(desc="in-depth analysis blending corpus facts with broader knowledge")
+    corpus_facts:   str = dspy.OutputField(desc="key facts drawn from the retrieved context")
+    own_reasoning:  str = dspy.OutputField(desc="interpretations, theories, or analysis beyond the corpus")
+    citations:      str = dspy.OutputField(desc="space-separated doc_ids referenced, or 'none' if mostly general knowledge")
+
+
 class ExamGraderSignature(dspy.Signature):
     """Grade a student's answer strictly against the retrieved textbook data.
     Deduct points for claims not supported by the context. Be specific in critique."""
@@ -113,6 +129,24 @@ class DeepResearchModule(dspy.Module):
         self.predict = dspy.ChainOfThought(DeepResearchSignature)
 
     def forward(self, question: str, user_profile: Optional[Dict[str, Any]] = None) -> dspy.Prediction:
+        chunks = self._pipeline.retrieve(question, top_k=self._k)
+        context = "\n\n".join(f"[{c.doc_id}] {c.text}" for c in chunks) or "No context retrieved."
+        return self.predict(question=question, context=context)
+
+
+class OpenAnalysisModule(dspy.Module):
+    """
+    Broad retrieval (k=7) + ChainOfThought over OpenAnalysisSignature.
+    Uses corpus as grounding but allows the LLM to reason beyond it.
+    """
+
+    def __init__(self, pipeline: RAGPipeline, k: int = 7) -> None:
+        super().__init__()
+        self._pipeline = pipeline
+        self._k = k
+        self.predict = dspy.ChainOfThought(OpenAnalysisSignature)
+
+    def forward(self, question: str, **kwargs) -> dspy.Prediction:
         chunks = self._pipeline.retrieve(question, top_k=self._k)
         context = "\n\n".join(f"[{c.doc_id}] {c.text}" for c in chunks) or "No context retrieved."
         return self.predict(question=question, context=context)
@@ -167,7 +201,7 @@ class GuidedLearningModule(dspy.Module):
 # Agent — mode router
 # ---------------------------------------------------------------------------
 
-MODES = {"deep_research", "guided_learning", "exam_grader"}
+MODES = {"deep_research", "guided_learning", "exam_grader", "open_analysis"}
 
 
 class DSPyAgent:
@@ -194,6 +228,7 @@ class DSPyAgent:
             "deep_research":   DeepResearchModule(pipeline, k=research_k),
             "guided_learning": GuidedLearningModule(pipeline, k=learning_k),
             "exam_grader":     ExamGraderModule(pipeline, k=5),
+            "open_analysis":   OpenAnalysisModule(pipeline, k=7),
         }
         if export_dir:
             self._load(Path(export_dir))
