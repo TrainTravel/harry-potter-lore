@@ -67,6 +67,12 @@ from pydantic import BaseModel, Field
 from context_harness.cost_tracker import estimate_cost_usd
 from context_harness.dspy_agent import DSPyAgent
 from context_harness.ingest_lore import build_pipeline
+from context_harness.security import PromptGuard, InputValidator, OutputFilter
+
+# Security — validate at the boundary
+_prompt_guard = PromptGuard()
+_input_validator = InputValidator(max_length=2000)
+_output_filter = OutputFilter()
 
 MODEL = os.getenv("DSPY_MODEL", "gemini/gemini-2.5-flash-lite")
 AGENT_DIR = os.getenv("AGENT_DIR", "my_profile.agent")
@@ -235,6 +241,14 @@ def ingest(req: IngestRequest) -> IngestResponse:
 
 @app.post("/ask", response_model=AskResponse)
 def ask(req: AskRequest) -> AskResponse:
+    # --- Security: validate input at the boundary ---
+    input_check = _input_validator.validate(req.question)
+    if input_check.should_block:
+        raise HTTPException(400, f"Input rejected: {input_check.reason}")
+    injection_check = _prompt_guard.scan(req.question)
+    if injection_check.should_block:
+        raise HTTPException(400, f"Input rejected: {injection_check.reason}")
+
     agent = get_agent(req.collection_name)
     pipeline = _pipelines_cache[req.collection_name]
 
@@ -302,6 +316,11 @@ def ask(req: AskRequest) -> AskResponse:
         Citation(doc_id=c.doc_id, text=c.text[:300], score=float(c.score or 0.0))
         for c in chunks[:5]
     ]
+
+    # --- Security: filter output before returning ---
+    output_check = _output_filter.scan(answer)
+    if output_check.should_block:
+        answer = _output_filter.safe_fallback()
 
     _record(turn_id, "turn.end", {"cost_usd": cost_usd})
 
