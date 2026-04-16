@@ -109,8 +109,15 @@ def get_agent(collection_name: str) -> DSPyAgent:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Eagerly load the default collection to warm up ChromaDB
+    key = os.environ.get("GOOGLE_API_KEY", "")
+    key_preview = f"{key[:4]}...{key[-4:]}" if len(key) > 8 else "(empty or short)"
+    print(f"[startup] GOOGLE_API_KEY present: {bool(key)}, preview: {key_preview}, length: {len(key)}")
+    print(f"[startup] DSPY_MODEL: {MODEL}")
+    print(f"[startup] AGENT_DIR: {AGENT_DIR}")
+    if not key:
+        print("[startup] WARNING: GOOGLE_API_KEY is not set — LLM calls will fail")
     get_agent("hp_lore")
+    print(f"[startup] Agent loaded, ChromaDB ready")
     yield
 
 
