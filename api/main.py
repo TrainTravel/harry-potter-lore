@@ -40,11 +40,25 @@ if _gkey:
 
 # DSPy passes api_key="string" (a Pydantic type placeholder) to litellm,
 # which overrides litellm's own env var lookup. Patch it out.
+# Also adds retry with exponential backoff for 429 rate limits.
 _orig_completion = litellm.completion
 def _patched_completion(*args, **kwargs):
+    import time as _time
     if kwargs.get("api_key") in ("string", "", None):
         kwargs.pop("api_key", None)
-    return _orig_completion(*args, **kwargs)
+    max_retries = 3
+    for attempt in range(max_retries + 1):
+        try:
+            return _orig_completion(*args, **kwargs)
+        except Exception as e:
+            err_str = str(e)
+            is_rate_limit = "429" in err_str or "rate" in err_str.lower() or "quota" in err_str.lower()
+            if is_rate_limit and attempt < max_retries:
+                wait = 2 ** attempt * 5  # 5s, 10s, 20s
+                print(f"[rate-limit] attempt {attempt + 1}/{max_retries}, retrying in {wait}s...")
+                _time.sleep(wait)
+            else:
+                raise
 litellm.completion = _patched_completion
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
