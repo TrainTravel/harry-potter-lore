@@ -6,6 +6,8 @@ on:
     paths:
       - "context_harness/**"
       - "tests/**"
+      - "data/**"
+      - "evals/**"
       - "pytest.ini"
       - "requirements.txt"
       - ".github/workflows/python-tests.yml"
@@ -14,6 +16,8 @@ on:
     paths:
       - "context_harness/**"
       - "tests/**"
+      - "data/**"
+      - "evals/**"
       - "pytest.ini"
       - "requirements.txt"
 
@@ -60,3 +64,41 @@ jobs:
           path: |
             .pytest_cache/
           retention-days: 7
+
+  dspy-eval:
+    name: DSPy EVALSET SLO check
+    runs-on: ubuntu-latest
+    # Only runs when the secret is available — skipped for external contributors
+    if: ${{ vars.GEMINI_API_KEY != '' || secrets.GEMINI_API_KEY != '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-eval-${{ hashFiles('requirements.txt') }}
+          restore-keys: pip-eval-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Ingest lore into ChromaDB
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python -m context_harness.ingest_lore
+
+      - name: Run SLO check (deep_research ≥80%, debate ≥60%)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python -m evals.slo_check --all-modes --verbose
