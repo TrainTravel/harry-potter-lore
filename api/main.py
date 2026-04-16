@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import os
 
-# Must happen BEFORE importing dspy/litellm — litellm reads env vars at import time
+# Must happen BEFORE importing dspy/litellm
 _gkey = os.environ.get("GOOGLE_API_KEY", "")
 if _gkey:
     os.environ.setdefault("GEMINI_API_KEY", _gkey)
@@ -33,6 +33,10 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import dspy
+import litellm
+# Belt-and-suspenders: set litellm's global api_key as fallback
+if _gkey:
+    litellm.api_key = _gkey
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
