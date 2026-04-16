@@ -92,7 +92,7 @@ def test_tracer_payload_stored():
 # ---------------------------------------------------------------------------
 
 async def test_trace_store_save_and_retrieve(tmp_path):
-    store = TraceStore(db_path=str(tmp_path / "traces.db"))
+    store = TraceStore(db_path=str(tmp_path / "traces.duckdb"))
     tracer = Tracer(turn_id="turn-abc", store=store)
     tracer.event(EventKind.TURN_START)
     tracer.event(EventKind.LLM_CALL, {"model": "gemini"})

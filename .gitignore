@@ -13,3 +13,10 @@ venv/
 list/
 # Eval artifacts
 evals/results.json
+# Compiled DSPy agent (large JSON, per-user)
+my_profile.agent/
+*.agent/
+# Scala build artifacts
+scala-harness/project/target/
+scala-harness/project/project/
+scala-harness/target/

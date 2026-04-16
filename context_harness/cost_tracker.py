@@ -37,7 +37,10 @@ DEFAULT_PRICING: Dict[str, Dict[str, float]] = {
     # model_name → {input: $/1M, output: $/1M}
     "gemini-1.5-pro":    {"input": 3.50,  "output": 10.50},
     "gemini-1.5-flash":  {"input": 0.35,  "output": 1.05},
-    "gemini-2.0-flash":  {"input": 0.10,  "output": 0.40},
+    "gemini-2.0-flash":       {"input": 0.10,  "output": 0.40},
+    "gemini-2.5-pro":         {"input": 1.25,  "output": 10.00},
+    "gemini-2.5-flash":       {"input": 0.30,  "output": 2.50},
+    "gemini-2.5-flash-lite":  {"input": 0.10,  "output": 0.40},
     "claude-opus-4":     {"input": 15.00, "output": 75.00},
     "claude-sonnet-4-6": {"input": 3.00,  "output": 15.00},
     "claude-haiku-4-5":  {"input": 0.80,  "output": 4.00},

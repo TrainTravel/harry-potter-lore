@@ -7,7 +7,7 @@ to find the root cause — don't just tweak the prompt."
 This module implements:
   - TraceEvent  — a single structured event (tool call, LLM call, retrieval, etc.)
   - Tracer      — records all events for a turn in sequence-number order
-  - TraceStore  — persists traces to SQLite for post-hoc debugging
+  - TraceStore  — persists traces to DuckDB for post-hoc debugging + analytics
   - EvalMetrics — aggregates success rate, latency (p50/p95), cost per task
 
 Design principle:
@@ -19,12 +19,13 @@ from __future__ import annotations
 
 import asyncio
 import json
-import sqlite3
 import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+import duckdb
 
 from . import otel_bridge
 
@@ -146,32 +147,36 @@ class Tracer:
 
 
 # ---------------------------------------------------------------------------
-# Trace Store (SQLite)
+# Trace Store (DuckDB)
 # ---------------------------------------------------------------------------
 
 class TraceStore:
-    """Persists trace events to SQLite for post-hoc debugging."""
+    """
+    Persists trace events to DuckDB for post-hoc debugging and analytics.
 
-    def __init__(self, db_path: str = "data/traces.db") -> None:
+    Hot fields (turn_id, kind, latency_ms, ts) are proper columns for fast
+    aggregation. The payload stays as a JSON column — DuckDB can query into
+    it with json_extract() without parsing overhead.
+    """
+
+    def __init__(self, db_path: str = "data/traces.duckdb") -> None:
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(db_path, check_same_thread=False)
+        self._conn = duckdb.connect(db_path)
         self._lock = asyncio.Lock()
         self._init()
 
     def _init(self) -> None:
         self._conn.execute("""
             CREATE TABLE IF NOT EXISTS trace_events (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                turn_id     TEXT NOT NULL,
+                turn_id     VARCHAR NOT NULL,
                 seq         INTEGER NOT NULL,
-                kind        TEXT NOT NULL,
-                payload     TEXT NOT NULL,
-                ts          REAL NOT NULL,
-                latency_ms  REAL
+                kind        VARCHAR NOT NULL,
+                payload     JSON,
+                ts          DOUBLE NOT NULL,
+                latency_ms  DOUBLE,
+                PRIMARY KEY (turn_id, seq)
             )
         """)
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_turn ON trace_events(turn_id)")
-        self._conn.commit()
 
     async def save(self, evt: TraceEvent) -> None:
         async with self._lock:
@@ -180,17 +185,51 @@ class TraceStore:
                 (evt.turn_id, evt.seq, evt.kind.value,
                  json.dumps(evt.payload, default=str), evt.ts, evt.latency_ms),
             )
-            self._conn.commit()
 
     def get_turn(self, turn_id: str) -> List[dict]:
         rows = self._conn.execute(
-            "SELECT seq,kind,payload,ts,latency_ms FROM trace_events "
-            "WHERE turn_id=? ORDER BY seq",
+            "SELECT seq, kind, payload, ts, latency_ms FROM trace_events "
+            "WHERE turn_id = ? ORDER BY seq",
             (turn_id,),
         ).fetchall()
         return [
-            {"seq": s, "kind": k, "payload": json.loads(p), "ts": t, "latency_ms": lm}
+            {"seq": s, "kind": k, "payload": json.loads(p) if p else {}, "ts": t, "latency_ms": lm}
             for s, k, p, t, lm in rows
+        ]
+
+    def list_turns(self, limit: int = 20) -> List[dict]:
+        """Recent turns with event count and wall latency."""
+        rows = self._conn.execute("""
+            SELECT turn_id,
+                   COUNT(*)              AS event_count,
+                   MAX(ts) - MIN(ts)     AS wall_s,
+                   COUNT(*) FILTER (WHERE kind = 'error') AS error_count
+            FROM trace_events
+            GROUP BY turn_id
+            ORDER BY MIN(ts) DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
+        return [
+            {"turn_id": r[0], "event_count": r[1], "wall_s": round(r[2], 3), "error_count": r[3]}
+            for r in rows
+        ]
+
+    def latency_by_kind(self, since_hours: float = 24) -> List[dict]:
+        """p50/p95 latency per event kind over a time window — the analytics payoff."""
+        cutoff = time.time() - since_hours * 3600
+        rows = self._conn.execute("""
+            SELECT kind,
+                   COUNT(*)                          AS n,
+                   PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY latency_ms) AS p50,
+                   PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY latency_ms) AS p95
+            FROM trace_events
+            WHERE latency_ms IS NOT NULL AND ts >= ?
+            GROUP BY kind
+            ORDER BY p95 DESC
+        """, (cutoff,)).fetchall()
+        return [
+            {"kind": r[0], "count": r[1], "p50_ms": round(r[2], 1), "p95_ms": round(r[3], 1)}
+            for r in rows
         ]
 
 
