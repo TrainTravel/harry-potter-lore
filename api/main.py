@@ -179,7 +179,7 @@ def debug_key() -> dict[str, Any]:
         "google_api_key_preview": f"{key_from_env[:4]}...{key_from_env[-4:]}" if len(key_from_env) > 8 else "short",
         "gemini_api_key_len": len(gemini_from_env),
         "litellm_api_key": f"{str(lt_api_key)[:4]}..." if lt_api_key else None,
-        "litellm_version": _lt.__version__,
+        "litellm_version": getattr(_lt, "__version__", getattr(_lt, "version", "unknown")),
         "get_api_key_from_env": f"{str(resolved)[:4]}..." if resolved and not str(resolved).startswith("error") else str(resolved),
         "raw_litellm_call": raw_error,
     }
