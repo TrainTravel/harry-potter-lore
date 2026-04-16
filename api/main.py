@@ -21,6 +21,12 @@ Design notes:
 from __future__ import annotations
 
 import os
+
+# Must happen BEFORE importing dspy/litellm — litellm reads env vars at import time
+_gkey = os.environ.get("GOOGLE_API_KEY", "")
+if _gkey:
+    os.environ.setdefault("GEMINI_API_KEY", _gkey)
+
 import time
 import uuid
 from contextlib import asynccontextmanager
