@@ -116,6 +116,7 @@ async def lifespan(app: FastAPI):
     print(f"[startup] AGENT_DIR: {AGENT_DIR}")
     if not key:
         print("[startup] WARNING: GOOGLE_API_KEY is not set — LLM calls will fail")
+    dspy.configure(lm=dspy.LM(MODEL, api_key=key))
     get_agent("hp_lore")
     print(f"[startup] Agent loaded, ChromaDB ready")
     yield
@@ -177,7 +178,8 @@ def ask(req: AskRequest) -> AskResponse:
 
     # Prepare LLM per-request
     model_name = MODEL if req.provider == "gemini" else req.provider
-    lm = dspy.LM(model_name, api_key=req.api_key) if req.api_key else dspy.LM(model_name)
+    api_key = req.api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+    lm = dspy.LM(model_name, api_key=api_key)
 
     t_llm = time.perf_counter()
     with dspy.context(lm=lm):
