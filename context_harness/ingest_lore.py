@@ -47,7 +47,7 @@ def parse_lore_file(path: Path) -> list[tuple[str, str]]:
     return docs
 
 
-def build_pipeline(persist: bool = True) -> RAGPipeline:
+def build_pipeline(persist: bool = True, collection_name: str = "hp_lore") -> RAGPipeline:
     """Build a RAGPipeline backed by a real ChromaDB store."""
     import chromadb
     from chromadb import Settings
@@ -64,7 +64,7 @@ def build_pipeline(persist: bool = True) -> RAGPipeline:
     # Build with use_chromadb=False so __init__ doesn't try to connect;
     # we wire in our own persistent client directly.
     pipeline = RAGPipeline(
-        collection_name="hp_lore",
+        collection_name=collection_name,
         chunking_strategy=ChunkingStrategy.PARAGRAPH,
         top_k=5,
         use_chromadb=False,
@@ -72,7 +72,7 @@ def build_pipeline(persist: bool = True) -> RAGPipeline:
     pipeline._client = client
     pipeline._ef = ef
     pipeline._collection = client.get_or_create_collection(
-        name="hp_lore",
+        name=collection_name,
         embedding_function=ef,
         metadata={"hnsw:space": "cosine"},
     )
