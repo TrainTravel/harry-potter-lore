@@ -7,6 +7,8 @@ dist/
 build/
 .env
 data/
+!data/hp_lore.txt
+!data/trainset_*.py
 # Virtualenvs
 .venv/
 venv/
