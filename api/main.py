@@ -116,7 +116,11 @@ async def lifespan(app: FastAPI):
     print(f"[startup] AGENT_DIR: {AGENT_DIR}")
     if not key:
         print("[startup] WARNING: GOOGLE_API_KEY is not set — LLM calls will fail")
-    dspy.configure(lm=dspy.LM(MODEL, api_key=key))
+    # litellm reads GEMINI_API_KEY for gemini/ models, not GOOGLE_API_KEY
+    if key and "GEMINI_API_KEY" not in os.environ:
+        os.environ["GEMINI_API_KEY"] = key
+        print(f"[startup] Copied GOOGLE_API_KEY → GEMINI_API_KEY for litellm")
+    dspy.configure(lm=dspy.LM(MODEL))
     get_agent("hp_lore")
     print(f"[startup] Agent loaded, ChromaDB ready")
     yield
