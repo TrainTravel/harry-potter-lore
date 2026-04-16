@@ -34,9 +34,18 @@ from typing import Any
 
 import dspy
 import litellm
-# Belt-and-suspenders: set litellm's global api_key as fallback
+
 if _gkey:
     litellm.api_key = _gkey
+
+# DSPy passes api_key="string" (a Pydantic type placeholder) to litellm,
+# which overrides litellm's own env var lookup. Patch it out.
+_orig_completion = litellm.completion
+def _patched_completion(*args, **kwargs):
+    if kwargs.get("api_key") in ("string", "", None):
+        kwargs.pop("api_key", None)
+    return _orig_completion(*args, **kwargs)
+litellm.completion = _patched_completion
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
