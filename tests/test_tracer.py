@@ -104,6 +104,76 @@ async def test_trace_store_save_and_retrieve(tmp_path):
     assert rows[1]["kind"] == "llm_call"
 
 
+async def test_snapshot_create_and_list(tmp_path):
+    store = TraceStore(db_path=str(tmp_path / "traces.duckdb"))
+    tracer = Tracer(turn_id="t-snap", store=store)
+    tracer.event(EventKind.TURN_START)
+    await asyncio.sleep(0.05)
+
+    snap = store.create_snapshot("v1", description="first checkpoint")
+    assert snap["name"] == "v1"
+    assert snap["max_event_ts"] > 0
+
+    snaps = store.list_snapshots()
+    assert len(snaps) == 1
+    assert snaps[0]["name"] == "v1"
+
+
+async def test_time_travel_get_turn_at(tmp_path):
+    store = TraceStore(db_path=str(tmp_path / "traces.duckdb"))
+    tracer = Tracer(turn_id="t-tt", store=store)
+    tracer.event(EventKind.TURN_START)
+    await asyncio.sleep(0.05)
+    store.create_snapshot("before")
+
+    tracer.event(EventKind.LLM_CALL, {"model": "gemini"})
+    await asyncio.sleep(0.05)
+    store.create_snapshot("after")
+
+    before_events = store.get_turn_at("t-tt", "before")
+    after_events = store.get_turn_at("t-tt", "after")
+    assert len(before_events) == 1
+    assert len(after_events) == 2
+
+
+async def test_time_travel_list_turns_at(tmp_path):
+    store = TraceStore(db_path=str(tmp_path / "traces.duckdb"))
+    t1 = Tracer(turn_id="t-early", store=store)
+    t1.event(EventKind.TURN_START)
+    await asyncio.sleep(0.05)
+    store.create_snapshot("mid")
+
+    t2 = Tracer(turn_id="t-late", store=store)
+    t2.event(EventKind.TURN_START)
+    await asyncio.sleep(0.05)
+
+    mid_turns = store.list_turns_at("mid")
+    all_turns = store.list_turns(limit=20)
+    assert len(mid_turns) == 1
+    assert mid_turns[0]["turn_id"] == "t-early"
+    assert len(all_turns) == 2
+
+
+async def test_diff_snapshots(tmp_path):
+    store = TraceStore(db_path=str(tmp_path / "traces.duckdb"))
+    t1 = Tracer(turn_id="t-d1", store=store)
+    t1.event(EventKind.TURN_START)
+    await asyncio.sleep(0.05)
+    store.create_snapshot("snap-a")
+
+    t2 = Tracer(turn_id="t-d2", store=store)
+    t2.event(EventKind.TURN_START)
+    t2.event(EventKind.ERROR, {"msg": "timeout"})
+    await asyncio.sleep(0.05)
+    store.create_snapshot("snap-b")
+
+    diff = store.diff_snapshots("snap-a", "snap-b")
+    assert diff["new_turns"] == 1
+    assert diff["new_events"] == 2
+    assert diff["new_errors"] == 1
+    assert diff["turns"][0]["turn_id"] == "t-d2"
+
+
 # ---------------------------------------------------------------------------
 # EvalMetrics
 # ---------------------------------------------------------------------------

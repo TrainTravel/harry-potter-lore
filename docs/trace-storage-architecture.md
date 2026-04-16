@@ -214,3 +214,68 @@ ORDER BY p95 DESC;
 
 This query runs from a laptop with DuckDB — no cluster, no server.
 That's the architectural payoff.
+
+## Time-travel: current DuckDB implementation
+
+The `TraceStore` now supports named snapshots and point-in-time queries
+without Iceberg. This works because trace events are append-only:
+
+```python
+store.create_snapshot("before-reindex")
+# ... agent runs, new events accumulate ...
+store.create_snapshot("after-reindex")
+
+# See the world as it was before reindex
+old_turns = store.list_turns_at("before-reindex")
+old_trace = store.get_turn_at("turn-abc", "before-reindex")
+
+# What changed between the two snapshots?
+diff = store.diff_snapshots("before-reindex", "after-reindex")
+# → {"new_turns": 42, "new_events": 187, "new_errors": 3, "turns": [...]}
+```
+
+Under the hood, a snapshot is just `(name, max_event_ts)`. Point-in-time
+queries filter by `WHERE ts <= snapshot.max_event_ts`. No data is copied
+or duplicated.
+
+**Limitation:** this only works for append-only data. If events were
+ever updated or deleted, the snapshot would not reflect the old state
+of mutated rows.
+
+## Future: when to add Iceberg
+
+The DuckDB snapshot approach breaks down when:
+
+1. **Events become mutable.** If you start annotating traces with
+   post-hoc labels (e.g. `UPDATE trace_events SET label = 'regression'
+   WHERE turn_id = X`), DuckDB snapshots can't show you the old label.
+   Iceberg snapshots the full table state including mutations.
+
+2. **Multiple agents write concurrently from different machines.**
+   DuckDB is single-writer. Iceberg coordinates concurrent Parquet
+   writes to S3 via its catalog (REST catalog, AWS Glue, or Nessie).
+
+3. **You need schema evolution without downtime.** Adding a column to
+   DuckDB requires `ALTER TABLE`. Iceberg handles schema evolution at
+   the metadata layer — old files keep the old schema, new files get
+   the new one, queries merge transparently.
+
+4. **Retention policy / storage tiering.** Iceberg supports expiring
+   old snapshots and compacting small files. DuckDB's file just grows.
+
+**Migration path when the time comes:**
+
+```python
+# Export current DuckDB to Parquet
+conn.execute("COPY trace_events TO 's3://traces/initial/' (FORMAT PARQUET)")
+
+# Create Iceberg table from the exported files
+# (use pyiceberg or spark to register the catalog entry)
+
+# Future reads
+conn.execute("SELECT * FROM iceberg_scan('s3://traces/agent_events')")
+```
+
+The schema stays identical. The queries stay identical (just swap
+the table name for `iceberg_scan(...)`). The migration is one
+`COPY ... TO` command, not a rewrite.
