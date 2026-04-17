@@ -7,7 +7,9 @@ from dspy.utils import DummyLM
 
 from context_harness.dspy_agent import (
     DeepResearchSignature, GuidedLearningSignature, DebateSignature,
+    SatiricalPodcastSignature,
     DeepResearchModule, GuidedLearningModule, DebateModule,
+    SatiricalPodcastModule,
     DSPyAgent, BackfillRequired,
     _write_manifest, _validate_manifest, MODES,
 )
@@ -207,10 +209,25 @@ def test_agent_raises_on_unknown_mode(pipeline):
         agent.forward("hallucination_mode", "anything")
 
 
+def test_satirical_podcast_signature_input_fields():
+    fields = SatiricalPodcastSignature.input_fields
+    assert "topic" in fields
+    assert "modern_angle" in fields
+    assert "context" in fields
+
+
+def test_satirical_podcast_signature_output_fields():
+    fields = SatiricalPodcastSignature.output_fields
+    assert "transcript" in fields
+    assert "comedic_tension" in fields
+    assert "citations" in fields
+
+
 def test_agent_modes_constant():
     assert "deep_research" in MODES
     assert "guided_learning" in MODES
     assert "debate" in MODES
+    assert "satirical_podcast" in MODES
 
 
 # ---------------------------------------------------------------------------

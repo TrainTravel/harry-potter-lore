@@ -7,6 +7,7 @@ from context_harness.metrics import (
     deep_research_metric, deep_research_strict_metric,
     socratic_metric, socratic_score,
     debate_metric, debate_score,
+    satirical_podcast_metric, satirical_podcast_score,
 )
 
 
@@ -243,3 +244,114 @@ def test_debate_score_rewards_quality():
         citations="",
     )
     assert debate_score(None, good) > debate_score(None, bad)
+
+
+# ---------------------------------------------------------------------------
+# Satirical Podcast trainset integrity
+# ---------------------------------------------------------------------------
+
+def test_satirical_podcast_trainset_nonempty():
+    from data.trainset_satirical_podcast import TRAINSET
+    assert len(TRAINSET) >= 15
+
+
+def test_satirical_podcast_trainset_citations_reference_valid_docs():
+    from data.trainset_satirical_podcast import TRAINSET, EVALSET
+    for ex in TRAINSET + EVALSET:
+        for cite in ex.citations.split():
+            assert cite in VALID_DOC_IDS, (
+                f"unknown citation {cite!r} in topic: {ex.topic!r}"
+            )
+
+
+def test_satirical_podcast_examples_mark_both_inputs():
+    from data.trainset_satirical_podcast import TRAINSET
+    for ex in TRAINSET:
+        keys = ex.inputs().keys()
+        assert "topic" in keys, f"'topic' not marked as input in: {ex.topic!r}"
+        assert "modern_angle" in keys, f"'modern_angle' not marked as input in: {ex.topic!r}"
+
+
+def test_satirical_podcast_evalset_disjoint_from_train():
+    from data.trainset_satirical_podcast import TRAINSET, EVALSET
+    train_topics = {ex.topic for ex in TRAINSET}
+    eval_topics  = {ex.topic for ex in EVALSET}
+    assert train_topics.isdisjoint(eval_topics)
+
+
+# ---------------------------------------------------------------------------
+# satirical_podcast_metric
+# ---------------------------------------------------------------------------
+
+_GOOD_TRANSCRIPT = (
+    "Lavender: So I ordered the invisibility cloak on WizAmazon — Prime Owl, supposedly two-day delivery.\n"
+    "Parvati: Two days? My owl took three generations to arrive. The original owl retired halfway through.\n"
+    "Lavender: And when it finally got here the cloak was listed as 'used — good condition'. I can SEE it!\n"
+    "Parvati: That's not how invisibility works, Lavender. That's fraud.\n"
+    "Lavender: I left a one-star review and they sent a Howler to my address."
+)
+
+
+def test_satirical_podcast_metric_passes_on_good_prediction():
+    ex = SimpleNamespace(citations="deathly-hallows")
+    pred = SimpleNamespace(
+        transcript=_GOOD_TRANSCRIPT,
+        comedic_tension="A cloak that makes you invisible cannot be inspected for condition, making quality control literally impossible.",
+        citations="deathly-hallows hogwarts",
+    )
+    assert satirical_podcast_metric(ex, pred) is True
+
+
+def test_satirical_podcast_metric_fails_when_transcript_too_short():
+    ex = SimpleNamespace(citations="hogwarts")
+    pred = SimpleNamespace(
+        transcript="Host: Hi. Guest: Hello.",
+        comedic_tension="Magic meets modernity in an amusing way.",
+        citations="hogwarts",
+    )
+    assert satirical_podcast_metric(ex, pred) is False
+
+
+def test_satirical_podcast_metric_fails_when_too_few_dialogue_lines():
+    ex = SimpleNamespace(citations="hogwarts")
+    pred = SimpleNamespace(
+        # Long but no "Speaker: text" dialogue structure
+        transcript="A" * 200,
+        comedic_tension="Magic meets modernity in an amusing way that creates tension.",
+        citations="hogwarts",
+    )
+    assert satirical_podcast_metric(ex, pred) is False
+
+
+def test_satirical_podcast_metric_fails_when_no_citations():
+    ex = SimpleNamespace(citations="deathly-hallows")
+    pred = SimpleNamespace(
+        transcript=_GOOD_TRANSCRIPT,
+        comedic_tension="A cloak that makes you invisible cannot be quality-checked.",
+        citations="",
+    )
+    assert satirical_podcast_metric(ex, pred) is False
+
+
+def test_satirical_podcast_metric_fails_when_comedic_tension_trivial():
+    ex = SimpleNamespace(citations="hogwarts")
+    pred = SimpleNamespace(
+        transcript=_GOOD_TRANSCRIPT,
+        comedic_tension="Funny.",
+        citations="hogwarts",
+    )
+    assert satirical_podcast_metric(ex, pred) is False
+
+
+def test_satirical_podcast_score_rewards_quality():
+    good = SimpleNamespace(
+        transcript=_GOOD_TRANSCRIPT,
+        comedic_tension="A cloak that makes you invisible cannot be inspected for condition.",
+        citations="deathly-hallows hogwarts",
+    )
+    bad = SimpleNamespace(
+        transcript="ok",
+        comedic_tension="",
+        citations="",
+    )
+    assert satirical_podcast_score(None, good) > satirical_podcast_score(None, bad)
