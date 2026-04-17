@@ -78,12 +78,29 @@ class PerspectiveShiftSignature(dspy.Signature):
 
     scenario:  str = dspy.InputField(desc="the real-world situation or question")
     character: str = dspy.InputField(desc="the HP character whose perspective to apply")
-    context:   str = dspy.InputField(desc="retrieved lore about this character, each prefixed [doc_id]")
+    context:   str = dspy.InputField(desc="retrieved lore passages about this character, each prefixed [doc_id]")
 
-    character_principle: str = dspy.OutputField(desc="the core principle or philosophy this character embodies, grounded in specific canon events")
-    applied_insight:     str = dspy.OutputField(desc="how this principle applies to the user's real-world scenario — specific, actionable, not generic")
-    reasoning:           str = dspy.OutputField(desc="the bridge: why this character's experience maps to this situation")
-    citations:           str = dspy.OutputField(desc="space-separated doc_ids used for character grounding")
+    character_principle: str = dspy.OutputField(
+        desc=("2-3 sentences. The core principle this character embodies, anchored "
+              "in a specific canon event or decision. Do NOT list traits or give a "
+              "summary of the character — name the one lesson their life teaches.")
+    )
+    applied_insight: str = dspy.OutputField(
+        desc=("3-4 sentences (roughly 60-90 words). A direct, actionable insight "
+              "for the user's scenario. Name a concrete action or stance they can "
+              "take this week. Avoid hedging ('it's important to...', 'you might "
+              "consider...') and avoid restating the scenario.")
+    )
+    reasoning: str = dspy.OutputField(
+        desc=("1-2 sentences. The bridge: why THIS character's specific experience "
+              "maps to THIS scenario. Cite the connecting event, not a trait.")
+    )
+    citations: str = dspy.OutputField(
+        desc=("Space-separated doc_ids formatted as [doc-id], each in square "
+              "brackets. Use ONLY doc_ids that appear verbatim in the context "
+              "field. Do not invent or partially-spell doc_ids. Example: "
+              "'[severus-snape/biography-early-life-001] [severus-snape/personality-and-traits-002]'")
+    )
 
 
 class OpenAnalysisSignature(dspy.Signature):
@@ -182,21 +199,86 @@ class DeepResearchModule(dspy.Module):
         return self.predict(question=question, context=context)
 
 
+_CHARACTER_SLUG: Dict[str, str] = {
+    "harry":        "harry-potter",
+    "harry potter": "harry-potter",
+    "hermione":     "hermione-granger",
+    "hermione granger": "hermione-granger",
+    "ron":          "ron-weasley",
+    "ron weasley":  "ron-weasley",
+    "dumbledore":   "albus-dumbledore",
+    "albus":        "albus-dumbledore",
+    "albus dumbledore": "albus-dumbledore",
+    "snape":        "severus-snape",
+    "severus":      "severus-snape",
+    "severus snape": "severus-snape",
+    "mcgonagall":   "minerva-mcgonagall",
+    "minerva":      "minerva-mcgonagall",
+    "minerva mcgonagall": "minerva-mcgonagall",
+    "luna":         "luna-lovegood",
+    "luna lovegood": "luna-lovegood",
+    "neville":      "neville-longbottom",
+    "neville longbottom": "neville-longbottom",
+    "voldemort":    "lord-voldemort",
+    "lord voldemort": "lord-voldemort",
+    "tom riddle":   "lord-voldemort",
+    "draco":        "draco-malfoy",
+    "draco malfoy": "draco-malfoy",
+    "hagrid":       "rubeus-hagrid",
+    "rubeus hagrid": "rubeus-hagrid",
+}
+
+
+def _normalize_character(name: str) -> str:
+    """Convert a free-form character name ('Dumbledore', 'Harry Potter') into
+    the canonical lowercase-hyphenated slug used in the character_lore
+    collection's metadata ('albus-dumbledore', 'harry-potter')."""
+    key = (name or "").strip().lower()
+    return _CHARACTER_SLUG.get(key, key.replace(" ", "-"))
+
+
 class PerspectiveShiftModule(dspy.Module):
     """
-    Retrieves lore about a specific character (k=5), then applies their
-    philosophy to a real-world scenario via ChainOfThought.
+    Retrieves lore about a specific character, then applies their philosophy
+    to a real-world scenario via ChainOfThought.
+
+    Retrieval strategy
+    ------------------
+    If ``char_pipeline`` is provided, use it with a
+    ``where={"character": <slug>}`` filter — chunks in the ``character_lore``
+    collection carry that metadata, so retrieval is hard-scoped to the
+    requested character. Fallback to the generic ``pipeline`` only when the
+    filtered retrieval returns nothing (covers characters not present in
+    the character corpus).
     """
 
-    def __init__(self, pipeline: RAGPipeline, k: int = 5) -> None:
+    def __init__(
+        self,
+        pipeline: RAGPipeline,
+        k: int = 5,
+        char_pipeline: Optional[RAGPipeline] = None,
+    ) -> None:
         super().__init__()
         self._pipeline = pipeline
+        self._char_pipeline = char_pipeline
         self._k = k
         self.predict = dspy.ChainOfThought(PerspectiveShiftSignature)
 
     def forward(self, scenario: str = "", character: str = "Dumbledore", **kwargs) -> dspy.Prediction:
-        query = f"{character} {scenario}".strip()
-        chunks = self._pipeline.retrieve(query, top_k=self._k)
+        slug = _normalize_character(character)
+        chunks: list = []
+
+        if self._char_pipeline is not None:
+            chunks = self._char_pipeline.retrieve(
+                scenario,
+                top_k=self._k,
+                where={"character": slug},
+            )
+        if not chunks:
+            # Fallback: generic retrieval on the default corpus
+            query = f"{character} {scenario}".strip()
+            chunks = self._pipeline.retrieve(query, top_k=self._k)
+
         context = "\n\n".join(f"[{c.doc_id}] {c.text}" for c in chunks) or "No context retrieved."
         return self.predict(character=character, scenario=scenario, context=context)
 
@@ -334,14 +416,25 @@ class DSPyAgent:
         export_dir: Optional[str] = None,
         research_k: int = 10,
         learning_k: int = 3,
+        char_pipeline: Optional[RAGPipeline] = None,
     ) -> None:
         self._pipeline = pipeline
+        # Best-effort: if no char_pipeline was passed explicitly, try to
+        # attach to a `character_lore` collection on the same Chroma client.
+        # Silently no-op if the collection doesn't exist (e.g. fresh install
+        # that hasn't run ingest_character_lore yet).
+        if char_pipeline is None:
+            char_pipeline = _try_build_character_pipeline(pipeline)
+        self._char_pipeline = char_pipeline
+
         self._modules: Dict[str, dspy.Module] = {
             "deep_research":   DeepResearchModule(pipeline, k=research_k),
             "guided_learning": GuidedLearningModule(pipeline, k=learning_k),
             "exam_grader":     ExamGraderModule(pipeline, k=5),
             "open_analysis":   OpenAnalysisModule(pipeline, k=7),
-            "perspective_shift": PerspectiveShiftModule(pipeline, k=5),
+            "perspective_shift": PerspectiveShiftModule(
+                pipeline, k=5, char_pipeline=char_pipeline,
+            ),
             "debate":            DebateModule(pipeline, k=7),
             "satirical_podcast": SatiricalPodcastModule(pipeline, k=6),
         }
@@ -433,6 +526,31 @@ class DSPyAgent:
 # ---------------------------------------------------------------------------
 # Router helpers
 # ---------------------------------------------------------------------------
+
+def _try_build_character_pipeline(default_pipeline: RAGPipeline) -> Optional[RAGPipeline]:
+    """Attach a second RAGPipeline to the ``character_lore`` Chroma collection.
+
+    Returns ``None`` silently if the collection doesn't exist (e.g. a fresh
+    install where ``scripts/ingest_character_lore.py`` hasn't been run).
+    Shares the same Chroma client + embedding function as the default
+    pipeline — no extra connections, no new config.
+    """
+    try:
+        client = getattr(default_pipeline, "_client", None)
+        ef = getattr(default_pipeline, "_ef", None)
+        if client is None or ef is None:
+            return None
+        # Check the collection exists before building a second pipeline
+        existing = {c.name for c in client.list_collections()}
+        if "character_lore" not in existing:
+            return None
+        from .ingest_lore import build_pipeline as _build
+        # build_pipeline will point at the character_lore collection
+        char_pipeline = _build(persist=True, collection_name="character_lore")
+        return char_pipeline
+    except Exception:
+        return None
+
 
 def _primary_input_field(module: dspy.Module) -> str:
     """

@@ -350,8 +350,22 @@ class RAGPipeline:
     # Retrieval
     # ------------------------------------------------------------------
 
-    def retrieve(self, query: str, top_k: Optional[int] = None) -> List[ScoredChunk]:
+    def retrieve(
+        self,
+        query: str,
+        top_k: Optional[int] = None,
+        where: Optional[Dict[str, Any]] = None,
+    ) -> List[ScoredChunk]:
         """Retrieve the top-k most relevant chunks for a query.
+
+        Args:
+            query: natural-language query string.
+            top_k: max chunks to return (defaults to ``self.top_k``).
+            where: optional ChromaDB metadata filter passed verbatim to
+                ``collection.query(where=...)``. Example:
+                ``{"character": "severus-snape"}`` restricts retrieval to
+                chunks whose metadata has that exact character slug.
+                Ignored by the in-memory keyword fallback.
 
         Returns ``ScoredChunk``s rather than raw ``Chunk``s — the score is a
         per-query artifact and should not be attached to the stored value.
@@ -359,11 +373,14 @@ class RAGPipeline:
         k = top_k or self.top_k
 
         if self._collection is not None:
-            results = self._collection.query(
-                query_texts=[query],
-                n_results=min(k, self._collection.count() or 1),
-                include=["documents", "metadatas", "distances"],
-            )
+            query_kwargs = {
+                "query_texts": [query],
+                "n_results":   min(k, self._collection.count() or 1),
+                "include":     ["documents", "metadatas", "distances"],
+            }
+            if where:
+                query_kwargs["where"] = where
+            results = self._collection.query(**query_kwargs)
             scored: List[ScoredChunk] = []
             for doc, meta, dist, cid in zip(
                 results["documents"][0],
@@ -375,7 +392,7 @@ class RAGPipeline:
                 scored.append(ScoredChunk(chunk=chunk, score=1.0 - dist))
             return scored
 
-        # fallback: simple keyword overlap scoring
+        # fallback: simple keyword overlap scoring (no metadata filter support)
         return self._keyword_retrieve(query, k)
 
     def _keyword_retrieve(self, query: str, k: int) -> List[ScoredChunk]:

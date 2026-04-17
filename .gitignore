@@ -6,9 +6,13 @@ __pycache__/
 dist/
 build/
 .env
-data/
+data/*
 !data/hp_lore.txt
 !data/trainset_*.py
+# Character-lore pipeline artifacts (small, reproducible, worth tracking)
+!data/character_lore.jsonl
+!data/character_lore_tagged.jsonl
+!data/tag_review*.md
 # Virtualenvs
 .venv/
 venv/

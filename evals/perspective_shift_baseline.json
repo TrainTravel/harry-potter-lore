@@ -1,0 +1,164 @@
+{
+  "run_timestamp": "2026-04-17T17:43:29Z",
+  "total_latency_s": 37.5,
+  "model": "gemini/gemini-2.5-flash-lite",
+  "corpus_note": "Baseline against current RAG corpus (10 doc_ids in data/hp_lore.txt). Re-run after ingesting data/character_lore_tagged.jsonl to measure corpus-expansion lift.",
+  "scenarios": [
+    {
+      "id": "career-paralysis",
+      "scenario": "I'm 28, stuck in a stable corporate job that pays well but feels soul-draining. A riskier creative path has opened up and my partner is supportive. I can't decide — every morning I tell myself I'll quit, every evening I talk myself out of it. The indecision is costing me more than either choice would.",
+      "character": "Dumbledore",
+      "expected_principle_keywords": [
+        "choice",
+        "right vs easy",
+        "moral weight",
+        "carrying"
+      ],
+      "character_principle": "\"It is our choices, Harry, that show what we truly are, far more than our abilities.\" This principle, embodied by Dumbledore throughout the Harry Potter series, emphasizes that true character is defined not by potential or circumstance, but by the decisions one makes when faced with alternatives, especially those that are difficult or morally ambiguous. Dumbledore himself demonstrated this repeatedly, choosing the path of resistance against Voldemort despite personal cost, and making difficult decisions for the greater good, even when they were painful. He understood that a choice, once made, sets one on a particular path with its own set of consequences and learning opportunities, and that the act of choosing itself is a fundamental aspect of agency and growth.",
+      "applied_insight": "Your current state of indecision is a form of paralysis, costing you valuable time and emotional energy. Dumbledore would advise you that the greatest disservice you can do yourself is to remain stuck. The key is to acknowledge that *any* choice, even the one that might seem \"wrong\" in hindsight, will propel you forward and provide clarity. Instead of agonizing over the perfect outcome, commit to making a decision, even if it's a temporary one or a decision to *try* one path for a defined period. For instance, set a deadline: \"By Friday, I will either submit my resignation or commit to staying for another six months.\" During that period, fully engage in the chosen path, whether it's the corporate job with renewed effort or the creative endeavor with full commitment. This active engagement, rather than passive deliberation, will reveal the true nature of your situation and guide your subsequent choices, much like a student learning through practical application rather than endless theoretical study.",
+      "reasoning": "Dumbledore, as a leader who has navigated immense personal and world-altering decisions, understands the weight of choice and the potential consequences of both action and inaction. He himself had to make difficult choices that impacted many, including his own life and the lives of those he cared about. He also understood the allure of power and the temptation of a seemingly easier path, which he ultimately renounced for a more difficult, but morally correct, one. This experience with profound, life-altering decisions, coupled with his deep understanding of human nature and the complexities of consequence, makes him a fitting character to offer perspective on a decision that feels overwhelming and fraught with uncertainty.",
+      "citations": "albus-dumbledore",
+      "latency_ms": 5733.5
+    },
+    {
+      "id": "impostor-syndrome",
+      "scenario": "I got promoted to senior engineer last month. Everyone in the meetings seems so much more qualified than me. I'm convinced they'll realize I don't belong here — I keep waiting to be found out.",
+      "character": "Neville",
+      "expected_principle_keywords": [
+        "late bloomer",
+        "growth",
+        "showing up",
+        "competence develops"
+      ],
+      "character_principle": "True courage and capability are not about the absence of fear or doubt, but about acting in spite of them. Neville's growth from a timid, bumbling student to a key figure in the fight against Voldemort demonstrates that self-belief can be cultivated through action and perseverance, even when initially feeling out of one's depth. His eventual mastery of Herbology and his leadership in the Battle of Hogwarts exemplify this.",
+      "applied_insight": "Instead of focusing on the perceived superiority of your colleagues, focus on the contributions you *can* make and the growth you *have* achieved. In meetings, actively listen and ask clarifying questions—this is a sign of engagement and a desire to learn, not incompetence. Take small, deliberate actions to build your confidence, such as preparing thoroughly for specific topics where you can contribute, or offering to research a particular area. Remind yourself that your promotion was earned, and that your role is to learn and grow into it, just as Neville learned and grew into his courage.",
+      "reasoning": "Neville Longbottom initially struggled with self-doubt and a feeling of inadequacy, particularly when surrounded by those he perceived as more talented or knowledgeable. This resonates with the user's experience of feeling unqualified and fearing exposure in their new senior engineer role. Neville's journey, marked by overcoming his insecurities and proving his worth through perseverance and courage, offers a relevant parallel.",
+      "citations": "hogwarts ron-weasley",
+      "latency_ms": 2414.3
+    },
+    {
+      "id": "unrequited-love",
+      "scenario": "I've been in love with my best friend for eight years. They just told me they're engaged to someone else. I'm happy for them — genuinely — and also the floor is gone. How do I stay in their life without becoming bitter, or lose them by pulling away?",
+      "character": "Snape",
+      "expected_principle_keywords": [
+        "sustained",
+        "protect without possessing",
+        "quiet service",
+        "not bitter"
+      ],
+      "character_principle": "Enduring loyalty and purpose can be forged even in the crucible of unrequited love and personal pain, by channeling those feelings into a commitment to a greater good or a chosen path, rather than allowing them to fester into destructive bitterness. This is exemplified by Snape's lifelong devotion to protecting Harry Potter, a commitment born from his love for Lily, which sustained him through immense hardship and moral compromise.",
+      "applied_insight": "Recognize that your love, though currently unrequited in the way you hoped, has clearly shaped your character and the depth of your friendship. Instead of withdrawing entirely to avoid pain, see if you can consciously re-route the energy of that deep care into a *new* form of loyalty to your friend: being a steadfast, supportive friend to them and their future spouse, from a respectful distance that allows you to heal. This means focusing on what you *can* give – your enduring friendship, your support for their happiness – rather than dwelling on what you cannot have. Define your role as a supportive presence in their life that is separate from romantic fulfillment, much like Snape defined his role as protector of Lily's son, a role that gave him purpose and allowed him to remain connected to his love, albeit indirectly. This requires a conscious decision to set boundaries for yourself to manage your own emotions, but not to sever the connection to the person you care about.",
+      "reasoning": "Snape's unrequited love for Lily Evans, which persisted throughout his life even after her marriage and death, mirrors the user's situation of loving a best friend who is now engaged to someone else. Snape's ability to channel this enduring, unfulfilled love into a complex, long-term loyalty and service to Dumbledore, despite immense personal pain and his own dark past, offers a framework for how the user might navigate their own situation. He demonstrates a capacity to maintain a connection and purpose even when his deepest desires are unattainable, without succumbing entirely to bitterness.",
+      "citations": "severus-snape",
+      "latency_ms": 4544.2
+    },
+    {
+      "id": "class-anxiety",
+      "scenario": "I grew up working-class and just started at a consulting firm where everyone went to Ivy League schools. Their small talk is about family trips to Tuscany. I feel like I'm performing a character all day. My work is solid but I'm exhausted.",
+      "character": "Ron",
+      "expected_principle_keywords": [
+        "not the money",
+        "belonging",
+        "who shows up for you",
+        "comparison"
+      ],
+      "character_principle": "True belonging and self-worth are found not in mimicking others or in external validation, but in embracing your own strengths and staying loyal to your core self and those who matter. Ron's struggle with feeling inadequate next to Harry and Hermione, and his eventual acceptance of his unique contributions (like his strategic mind in chess and his Quidditch skills), demonstrates this principle. He learned that his worth wasn't diminished by their extraordinary talents, and that his loyalty and bravery were invaluable in their own right.",
+      "applied_insight": "Recognize that your solid work ethic and capabilities are your foundational strengths. Instead of exhausting yourself trying to perform a persona that fits the \"Tuscany trips\" small talk, focus on excelling in your role. The exhaustion you feel is a signal that you're expending energy on aspects that aren't essential to your core value at the firm – your performance. Identify one or two colleagues who seem genuinely approachable or who have complementary skills, and try to build a rapport based on shared work challenges rather than performative social mimicry. This is where you can find genuine connection and support, much like Ron found strength in his friendships with Harry and Hermione, despite their different backgrounds and talents.",
+      "reasoning": "Ron Weasley, despite coming from a loving but financially modest background, navigated the wizarding world and its social hierarchies with his own unique brand of courage and loyalty. He consistently felt overshadowed by Harry's fame and Hermione's intellect, leading him to question his own worth and capabilities, much like the user feels out of place in their new, elite environment. His journey is one of finding his footing and realizing his inherent value, even when surrounded by those who seem to have more inherent advantages or social capital.",
+      "citations": "ron-weasley",
+      "latency_ms": 3631.7
+    },
+    {
+      "id": "grief-hollow",
+      "scenario": "My mother died seven months ago. I'm not crying anymore. I'm supposed to be 'doing better' but I feel hollow and can't connect with people who haven't lost a parent. The distance is starting to scare me.",
+      "character": "Luna",
+      "expected_principle_keywords": [
+        "grief doesn't resolve",
+        "carrying",
+        "unchanged love",
+        "patience"
+      ],
+      "character_principle": "Luna believes that grief and love can coexist, and that acknowledging loss does not mean being defined by it. She demonstrates a profound understanding that the people we lose continue to exist in our hearts and memories, and that this connection can be a source of strength rather than just sorrow. This is evident in her continued affection and memories of her mother, and her ability to find joy and meaning in life despite her loss. Her readiness to accept and even find comfort in the natural cycles of life and death, often expressed through her unusual beliefs about creatures and the afterlife, shows an embrace of what is, rather than a struggle against it.",
+      "applied_insight": "Your feeling of hollowness is a natural part of processing profound grief, and it doesn't mean you're \"doing it wrong.\" Instead of trying to push past the feeling of disconnect, acknowledge it as a space where your mother's memory resides. Instead of striving to \"be better\" by forgetting or minimizing the loss, focus on how her presence continues to inform your life. Seek out small, quiet moments to remember her – not in a way that fuels sadness, but in a way that honors the love and connection you shared. This could be visiting a place that was special to both of you, looking at a photograph, or even just holding onto a small object that reminds you of her. When you feel disconnected from others, remember that your experience is unique, and that's okay. Instead of forcing connections that feel inauthentic, allow yourself to be present in your own space, holding your memories close. Over time, this inner connection will create a more solid foundation from which you can eventually re-engage with the world, bringing your unique understanding of love and loss with you.",
+      "reasoning": "Luna is known for her unique perspective on life, death, and the unseen. She doesn't shy away from the concept of loss but approaches it with a quiet understanding and acceptance that allows her to continue living fully. Her ability to hold onto love and memory without being consumed by grief, even when facing profound loss like her mother's death, offers a way to navigate the user's current feelings of hollowness and disconnection.",
+      "citations": "[deathly-hallows] [severus-snape] [horcruxes] [albus-dumbledore] [harry-potter]",
+      "latency_ms": 3328.3
+    },
+    {
+      "id": "nonconformity-office",
+      "scenario": "I'm the only openly queer person at my office. I've been code-switching for two years — corporate voice, corporate clothes, corporate weekend stories. It's costing me real energy and I'm starting to resent everyone. But the job is genuinely good.",
+      "character": "Luna",
+      "expected_principle_keywords": [
+        "stay yourself",
+        "the right people find you",
+        "cost of masking"
+      ],
+      "character_principle": "Luna's core principle is radical self-acceptance and the courage to be oneself, regardless of external judgment or the need for conformity. This is demonstrated throughout her time at Hogwarts where she is often ostracized for her eccentric beliefs and unusual mannerisms, yet she never wavers in her own truth. She speaks openly about Nargles, Wrackspurts, and other creatures that others dismiss, and she forms deep connections with those who accept her as she is, like Neville and the others in Dumbledore's Army. She doesn't attempt to \"corporate speak\" or \"dress\" in a way that would make her more palatable to those who don't understand her.",
+      "applied_insight": "Instead of continuing to code-switch, which is draining your energy and breeding resentment, consider a \"Luna-esque\" approach. Identify *one* small aspect of your authentic self that you can allow to show at work, without being overtly disruptive. This could be a subtle accessory, a mention of a genuine hobby in casual conversation, or a slightly more personal anecdote about your weekend. The goal isn't to be provocatively different, but to start reclaiming small pieces of your energy by allowing a sliver of your true self to exist in that space. Observe how this feels and if it leads to any positive internal shifts, which may then give you the strength to gradually express more of yourself or to re-evaluate if this job, despite its other merits, is truly worth the cost of suppressing your identity.",
+      "reasoning": "Luna Lovegood is known for her unwavering commitment to her own unique sense of self, even when it goes against the grain of popular opinion or expectations. She doesn't try to fit in with those who don't understand her or her beliefs, and she encourages others to embrace their own individuality. The user is struggling with the pressure to conform at work, which is draining their energy and leading to resentment. Luna's approach to life, which involves embracing one's authentic self and not bending to external pressures, can offer a valuable perspective.",
+      "citations": "[luna-lovegood]",
+      "latency_ms": 2761.5
+    },
+    {
+      "id": "toxic-advisor",
+      "scenario": "My PhD advisor is brilliant but cruel. He publicly humiliates students in lab meetings. I'm three years in — leaving means losing all that progress. Staying means another two years of being torn down. Everyone says 'just finish.'",
+      "character": "McGonagall",
+      "expected_principle_keywords": [
+        "no duty requires enduring cruelty",
+        "boundaries",
+        "protection"
+      ],
+      "character_principle": "\"Merit and hard work are to be rewarded, and cruelty and bullying are to be punished.\" McGonagall, while demanding, consistently shows a deep concern for her students' well-being and fair treatment. She is not afraid to confront authority figures when she believes they are acting unjustly, as seen in her interactions with Dolores Umbridge and her defense of students. She believes in upholding the standards of Hogwarts and ensuring a safe and productive learning environment.",
+      "applied_insight": "Your advisor's behavior is unacceptable and is actively hindering your academic and personal growth. While the thought of starting over is daunting, the prospect of enduring two more years of abuse is equally damaging. McGonagall would advise you to document specific instances of your advisor's cruel behavior, noting dates, times, and what was said or done. Then, you should seek out the department head or an ombudsman within your university to formally report the issue. Present your documentation clearly and factually. While it might feel like a risk, it is a necessary step to take control of your situation and advocate for yourself, rather than passively accepting mistreatment. If the university fails to address the situation, you may then need to consider the difficult decision of transferring, but not before exhausting all official channels.",
+      "reasoning": "McGonagall, as a formidable witch and head of Gryffindor, consistently upholds a standard of rigorous academic excellence and personal integrity. She has no patience for those who would abuse their authority or mistreat students. Her own experience as a student, and later as a teacher and administrator, has shown her the importance of standing up to injustice, even when it is difficult or goes against popular opinion. She would likely see a cruel advisor as a clear abuse of power and would advise the student to find a way to address it directly, or through proper channels, rather than endure it in silence.",
+      "citations": "hogwarts",
+      "latency_ms": 5189.6
+    },
+    {
+      "id": "family-expectations",
+      "scenario": "My parents expect me to take over their small business. I want to be a public-school teacher. Every time I bring it up, my mother cries and my father goes silent for days. I've started lying about interviews to avoid the fight.",
+      "character": "Neville",
+      "expected_principle_keywords": [
+        "inherited vs chosen path",
+        "quiet courage",
+        "you are not betraying them"
+      ],
+      "character_principle": "The principle Neville embodies is \"Finding your own courage and defining your own worth, even when it means defying expectations and overcoming self-doubt.\" This is evident in his growth from a timid, accident-prone student to a brave leader who stood up to Voldemort and his Death Eaters, ultimately playing a crucial role in the defeat of Voldemort by destroying the final Horcrux. He learned to trust his own abilities and convictions, even when they differed from what was implicitly or explicitly expected of him by others.",
+      "applied_insight": "Your parents' emotional reactions – your mother's tears and your father's silence – are powerful tools of manipulation, even if unintentional. They create an emotional burden that makes it difficult to stand firm in your own desires. Neville, too, felt the weight of his family's history and the fear of disappointing them. Instead of continuing to lie and avoid the inevitable confrontation, use Neville's eventual bravery as inspiration. Find a moment, perhaps after a significant emotional reaction from them, to calmly and firmly state your intentions again. Frame it not as a rejection of their business or their feelings, but as a statement of your own truth. You might say something like, \"I understand this is difficult for you, and I love you both, but I cannot pursue a path that does not fulfill me. My dream is to be a teacher, and I need to try for that, even if it means disappointing you in the short term. Lying about it is hurting us all.\" This is not about seeking their approval for your dream, but about asserting your right to pursue it, much like Neville eventually fought for his own identity beyond his family's legacy.",
+      "reasoning": "Neville Longbottom struggled immensely with his family's expectations and his own perceived inadequacies. He was often overshadowed by his parents' bravery and accomplishments, and initially, he was afraid to disappoint them or step into their legacy. His journey involved finding his own courage and path, separate from what was expected of him, which resonates with the user's situation of wanting to pursue a different career than what their parents envision.",
+      "citations": "[harry-potter]",
+      "latency_ms": 3082.3
+    },
+    {
+      "id": "cofounder-betrayal",
+      "scenario": "My co-founder has been secretly interviewing at other companies for six months while I've been pulling 80-hour weeks. I found out yesterday. I can't look at them the same. I also can't run the company alone, and we have investors.",
+      "character": "Ron",
+      "expected_principle_keywords": [
+        "trust broken once",
+        "clear-eyed",
+        "not every breach ends a thing",
+        "what you owe yourself"
+      ],
+      "character_principle": "Loyalty and enduring bonds, even through personal insecurity and betrayal, are paramount. Ron’s loyalty to Harry and Hermione, and his deep desire for belonging within their circle, is a defining characteristic. This loyalty isn't always loud or demonstrative, but it’s a bedrock of his character, and he often grapples with his place within the trio, feeling overshadowed. Yet, when it counts, he is steadfast, showing up for his friends even when his own insecurities might tempt him to withdraw. This principle is demonstrated through his consistent presence and support for Harry and Hermione, even when he feels less capable or overshadowed. [ron-weasley]",
+      "applied_insight": "Your immediate feeling of betrayal is valid, and it's understandable to question the partnership. However, recall the foundational trust you and your co-founder established. Ron's principle of enduring loyalty, even when feeling inadequate or wronged, suggests that rather than immediately severing ties, the most effective path might be a direct, albeit difficult, conversation. Schedule a meeting specifically to address the situation. State what you've discovered and the impact it has on your trust. Listen to their explanation without interruption, focusing on understanding their motivations, even if you don't agree with them. This approach acknowledges the damage while leaving room for the possibility of rebuilding, or at least a clear, honest path forward for the sake of the company and investors, much like Ron's commitment to his friends despite personal struggles. [ron-weasley]",
+      "reasoning": "Ron's experience in the Harry Potter series is marked by a consistent struggle with feelings of inadequacy, often stemming from comparing himself to Harry's extraordinary abilities and Hermione's intelligence. Despite this, he consistently demonstrates fierce loyalty and bravery, especially when his friends are in danger. In this scenario, the user is experiencing a deep sense of betrayal and is questioning their partnership, similar to how Ron might feel if someone he trusted (like Harry or Hermione) fundamentally broke that trust. However, Ron's underlying principle is loyalty and the importance of the bond of friendship, even when tested by personal insecurity or external pressures. He would likely recognize the value of the partnership, even with the betrayal, and seek to understand the situation and address it directly, rather than abandoning it immediately.",
+      "citations": "ron-weasley",
+      "latency_ms": 3608.0
+    },
+    {
+      "id": "viral-fame",
+      "scenario": "A video I posted went viral. Now strangers recognize me on the subway, brands are reaching out, my parents are asking when I'll 'monetize.' I just wanted to make one silly video. I'm exhausted by attention I never asked for.",
+      "character": "Harry",
+      "expected_principle_keywords": [
+        "fame is not chosen",
+        "protect your inner life",
+        "no obligation to scale"
+      ],
+      "character_principle": "Harry's defining principle, particularly early on, is a deep yearning for normalcy and a desire to be seen as himself, rather than as a symbol or a celebrity. He is often overwhelmed and sometimes resentful of the fame he never sought, preferring genuine connection and quiet existence. His greatest desire, after defeating Voldemort, was to live a quiet life with his family, free from the constant spotlight.",
+      "applied_insight": "You are experiencing a form of unwanted fame. Just as Harry navigated the label of \"The Boy Who Lived,\" you can navigate this new attention by focusing on what is authentic to you, rather than what external pressures suggest you *should* be or do. Your initial desire was simply to create something \"silly.\" Hold onto that as your core. Recognize that brands and your parents have motivations that may not align with your own well-being or creative intent. You have agency to set boundaries. You don't have to \"monetize\" or lean into this attention if it feels overwhelming or inauthentic. Prioritize your peace and your original creative impulse. Perhaps create a separate, private account for more personal content, or clearly define what kinds of brand collaborations, if any, feel right to you, and politely decline the rest. Your exhaustion is a valid signal that this attention is not serving your well-being.",
+      "reasoning": "Harry Potter is famously known as \"The Boy Who Lived\" from the moment he survived Voldemort's attack as an infant. This fame was thrust upon him, and he spent much of his life struggling with the attention, the expectations, and the constant danger that his fame brought. He often wished for a normal life, away from the public eye. The user's experience of sudden, unwanted attention and the pressure to capitalize on it mirrors Harry's own struggles with his celebrity.",
+      "citations": "harry-potter",
+      "latency_ms": 3171.4
+    }
+  ]
+}
