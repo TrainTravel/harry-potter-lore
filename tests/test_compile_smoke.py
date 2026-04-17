@@ -26,6 +26,7 @@ from context_harness.dspy_agent import (
     ExamGraderModule,
     DebateModule,
     SatiricalPodcastModule,
+    PerspectiveShiftModule,
     _primary_input_field,
 )
 from context_harness.metrics import (
@@ -34,6 +35,7 @@ from context_harness.metrics import (
     exam_grader_metric,
     debate_metric,
     satirical_podcast_metric,
+    perspective_shift_metric,
 )
 from context_harness.ingest_lore import build_pipeline, parse_lore_file, LORE_FILE
 
@@ -152,6 +154,16 @@ def test_satirical_podcast_compile(pipeline):
     assert compiled is not None
 
 
+def test_perspective_shift_compile(pipeline):
+    """Regression test: PerspectiveShiftModule.forward must accept `scenario`
+    (the Signature's primary input field), and the trainset's `.with_inputs(
+    "scenario", "character")` must match the module's kwargs."""
+    from data.trainset_perspective_shift import TRAINSET
+    module = PerspectiveShiftModule(pipeline, k=2)
+    compiled = _optimizer(perspective_shift_metric).compile(module, trainset=TRAINSET[:2])
+    assert compiled is not None
+
+
 # ---------------------------------------------------------------------------
 # Canonical-rule invariant: router introspection must find a primary input
 # field for every mode, and that field must be a real forward() parameter.
@@ -163,6 +175,7 @@ def test_satirical_podcast_compile(pipeline):
     (ExamGraderModule,       "question"),
     (DebateModule,           "position"),
     (SatiricalPodcastModule, "topic"),
+    (PerspectiveShiftModule, "scenario"),
 ])
 def test_primary_input_field_matches_forward_param(pipeline, module_cls, expected_primary):
     """The router's introspection must agree with the Module's forward() signature."""
