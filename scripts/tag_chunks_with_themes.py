@@ -50,9 +50,11 @@ VOCABULARY = [
     "perseverance", "moral-ambiguity", "unrequited-love",
     "fear-of-death", "late-bloomer", "class-anxiety", "prejudice",
     "family", "courage", "discipline", "forgiveness",
-    # Added 2026-04-17 after human review — gaps surfaced by spot-check:
+    # Added 2026-04-17 after v1 human review — gaps in interpersonal themes:
     "betrayal", "protection", "trust", "manipulation", "trauma",
     "regret", "cruelty", "disillusionment", "jealousy", "double-life",
+    # Added 2026-04-17 after v2 subagent review — remaining gaps:
+    "legacy", "nonconformity", "humiliation",
 ]
 
 PROMPT_TEMPLATE = """You are a literary analyst tagging passages about Harry Potter characters.
@@ -71,8 +73,17 @@ Rules:
   `cruelty`, `betrayal`, `fear-of-death` — rather than neutral words.
 - `friendship` is often too generic; if the bond hinges on being believed
   or relied on, prefer `trust`; if familial-bond-like, prefer `family`.
-- If a passage is purely factual (e.g. dates, item lists), return ["factual"]
-  — we'll filter those out downstream.
+- `duty` is a dumping ground — if the passage has a more specific theme
+  (`protection`, `legacy`, `leadership`, `double-life`), prefer that.
+- Sustained deception with moral cause (Snape, Regulus, Dumbledore-Grindelwald
+  era) → `double-life` + `manipulation`.
+- Luna-style gentle refusal to conform → `nonconformity` (NOT `rebellion`,
+  which implies political stance).
+- Neville-Howler, Ron-mocked-by-Malfoy scenes → `humiliation` fits better
+  than `trauma` (too clinical) or `class-anxiety` (too narrow).
+- If a passage is purely factual (dates, item lists, dry exposition), return
+  an EMPTY array []. We filter empty tags downstream. Do NOT invent tags
+  outside the vocabulary.
 
 Controlled vocabulary:
 {vocab}
@@ -96,6 +107,13 @@ easy comfort; she sat with him for hours, asking nothing, simply present."
 Tags: ["trust", "grief", "friendship"]
 (NOT just "friendship" — the bond is specifically about being a safe presence,
 i.e. trust.)
+
+Passage: "Snape reported Voldemort's movements to Dumbledore year after year,
+while publicly appearing as a loyal Death Eater to the Dark Lord. Every
+conversation he had with either side carried the weight of the other."
+Tags: ["double-life", "manipulation", "duty"]
+(NOT "loyalty" — loyalty is the surface, the theme is sustained deception
+with cause. `duty` stays because the deception is in service of an obligation.)
 
 ### Now tag these:
 
@@ -210,7 +228,9 @@ def main(argv: list[str] | None = None) -> int:
 
     client = genai.Client(api_key=_load_api_key())
 
-    valid = set(VOCABULARY) | {"factual"}
+    # Note: `factual` is NOT in valid — if Gemini returns it, we drop it.
+    # The prompt now tells it to return [] for purely factual passages.
+    valid = set(VOCABULARY)
     already = _already_tagged(args.out_path)
     with args.in_path.open(encoding="utf-8") as fh:
         chunks = [json.loads(line) for line in fh]
