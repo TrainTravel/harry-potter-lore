@@ -68,8 +68,12 @@ jobs:
   dspy-eval:
     name: DSPy EVALSET SLO check
     runs-on: ubuntu-latest
-    # Only runs when the secret is available — skipped for external contributors
-    if: ${{ vars.GEMINI_API_KEY != '' || secrets.GEMINI_API_KEY != '' }}
+    # Opt-in gate. GitHub forbids `secrets.*` in job-level `if:` expressions
+    # (only `vars.*` is permitted), so the maintainer must set a repo
+    # variable `GEMINI_API_KEY` to any non-empty value to enable this job,
+    # in addition to the secret with the same name used at step runtime.
+    # External contributor forks won't have either set, so the job is skipped.
+    if: ${{ vars.GEMINI_API_KEY != '' }}
 
     steps:
       - name: Checkout
