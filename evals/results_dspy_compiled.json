@@ -1,0 +1,114 @@
+{
+  "label": "compiled",
+  "accuracy": 0.5,
+  "rows": [
+    {
+      "id": "q1",
+      "kind": "easy",
+      "correct": true,
+      "retrieval_hit": true,
+      "answer": "Albus Dumbledore was killed by Severus Snape.",
+      "reason": "The agent correctly identified Severus Snape as the killer of Dumbledore, which is the main fact from the reference answer.",
+      "latency_s": 1.1408587050100323
+    },
+    {
+      "id": "q2",
+      "kind": "easy",
+      "correct": true,
+      "retrieval_hit": false,
+      "answer": "The three Deathly Hallows are the Elder Wand, the Resurrection Stone, and the Invisibility Cloak. According to legend, these were created by Death and given to the Peverell brothers.",
+      "reason": "The agent correctly identifies the three Deathly Hallows and their names match the reference answer. The additional information about their origin is not strictly required by the question, but does not make the answer incorrect.",
+      "latency_s": 0.3488698680012021
+    },
+    {
+      "id": "q3",
+      "kind": "easy",
+      "correct": false,
+      "retrieval_hit": false,
+      "answer": "The provided text does not explicitly state the incantation for the Patronus Charm. It mentions that Hermione Granger's Patronus took the form of an otter and that members of the Order of the Phoenix used Patronus messengers for communication, but the specific spell is not mentioned.",
+      "reason": "judge parse failure: {\"correct\": false, \"reason\": \"The reference answer provides the correct incantation, 'Expecto Patronum', but the agent's",
+      "latency_s": 0.34295140998438
+    },
+    {
+      "id": "q4",
+      "kind": "easy",
+      "correct": true,
+      "retrieval_hit": true,
+      "answer": "Lord Voldemort created seven Horcruxes. He split his soul into seven pieces, with one piece remaining in his body and the other six encased in Horcruxes.",
+      "reason": "The agent correctly identified that Voldemort created seven Horcruxes.",
+      "latency_s": 0.45005501399282366
+    },
+    {
+      "id": "q5",
+      "kind": "easy",
+      "correct": false,
+      "retrieval_hit": false,
+      "answer": "The provided context does not contain information about the location of Diagon Alley.",
+      "reason": "The agent incorrectly stated that the information was not available in the provided context, when it was present.",
+      "latency_s": 1.7715475519944448
+    },
+    {
+      "id": "q6",
+      "kind": "easy",
+      "correct": true,
+      "retrieval_hit": false,
+      "answer": "Harry Potter's Patronus takes the form of a stag. This form reflects his father's Animagus form.",
+      "reason": "The agent correctly identified the Patronus form as a stag and noted its connection to Harry's father's Animagus form, aligning with the reference answer.",
+      "latency_s": 1.961547907005297
+    },
+    {
+      "id": "q7",
+      "kind": "multi",
+      "correct": false,
+      "retrieval_hit": false,
+      "answer": "The provided context does not contain information explaining why Harry's and Voldemort's wands are referred to as \"brother wands.\" It does mention that Harry's wand's core is a phoenix feather from Fawkes, and that Voldemort's wand contains the other feather from the same phoenix. This shared origin from the same phoenix, Fawkes, is the reason they are known as \"brother wands.\"",
+      "reason": "The agent correctly identifies that the wands are brother wands due to originating from the same phoenix but incorrectly states the context does not contain the information, when it does.",
+      "latency_s": 2.919978210993577
+    },
+    {
+      "id": "q8",
+      "kind": "multi",
+      "correct": false,
+      "retrieval_hit": true,
+      "answer": "Albus Dumbledore founded and led the Order of the Phoenix to oppose the dark wizard Lord Voldemort. While the provided text doesn't explicitly state Dumbledore *defeated* Voldemort in a way that ended his reign, it does mention Dumbledore wielding the Elder Wand, which is the most powerful wand in existence. The Elder Wand played a crucial role in Voldemort's ultimate downfall; after Voldemort mistakenly believed Severus Snape was the master of the Elder Wand and had Snape killed, the wand's all",
+      "reason": "The agent incorrectly identifies the dark wizard Dumbledore defeated. The reference states Dumbledore defeated Grindelwald, not Voldemort. The agent also incorrectly states the Elder Wand's allegiance transferred to Harry Potter after Snape's death, when in reality it transferred to Harry after he disarmed Draco Malfoy, who had previously disarmed Dumbledore.",
+      "latency_s": 2.9204838289879262
+    },
+    {
+      "id": "q9",
+      "kind": "multi",
+      "correct": true,
+      "retrieval_hit": true,
+      "answer": "Severus Snape's primary motivation for working against Voldemort stemmed from his deep and lifelong love for Lily Evans (later Lily Potter). After Voldemort targeted Lily, Snape defected to Dumbledore's side. He then acted as a double agent, appearing loyal to Voldemort while secretly working for the Order of the Phoenix. His memories revealed that his true loyalty lay with Dumbledore, and his actions were ultimately driven by his love for Lily.",
+      "reason": "The agent correctly identified Snape's motivation as his love for Lily Potter.",
+      "latency_s": 1.6711143360007554
+    },
+    {
+      "id": "q10",
+      "kind": "multi",
+      "correct": false,
+      "retrieval_hit": true,
+      "answer": "Harry Potter was sorted into Gryffindor house at Hogwarts. Gryffindor is known to value bravery and sharp tactical instincts.",
+      "reason": "The agent incorrectly stated that Gryffindor values sharp tactical instincts. The reference answer states it values chivalry.",
+      "latency_s": 2.8090274069982115
+    },
+    {
+      "id": "q11",
+      "kind": "distractor",
+      "correct": false,
+      "retrieval_hit": null,
+      "answer": "The provided context does not explicitly state who was the Minister for Magic during the Battle of Hogwarts. It does mention that Hermione Granger eventually rose to become Minister for Magic, but this was after the Second Wizarding War.",
+      "reason": "The agent did not state that the corpus does not contain the information. Instead, it provided additional information that was not requested.",
+      "latency_s": 1.5212685640144628
+    },
+    {
+      "id": "q12",
+      "kind": "distractor",
+      "correct": true,
+      "retrieval_hit": null,
+      "answer": "The provided context does not contain information about the population of Hogsmeade village.",
+      "reason": "The agent correctly identified that the information was not present in the corpus, matching the reference answer.",
+      "latency_s": 1.3714866730151698
+    }
+  ]
+}

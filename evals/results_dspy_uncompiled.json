@@ -1,0 +1,114 @@
+{
+  "label": "uncompiled",
+  "accuracy": 0.5833333333333334,
+  "rows": [
+    {
+      "id": "q1",
+      "kind": "easy",
+      "correct": true,
+      "retrieval_hit": true,
+      "answer": "Albus Dumbledore was killed by Severus Snape. This act was part of Dumbledore's own plan to protect Draco Malfoy and to maintain Snape's standing with Lord Voldemort, with Snape carrying out Dumbledore's request.",
+      "reason": "The agent correctly identifies Severus Snape as the killer and mentions it was part of Dumbledore's plan, which aligns with the reference answer.",
+      "latency_s": 1.5108989189902786
+    },
+    {
+      "id": "q2",
+      "kind": "easy",
+      "correct": true,
+      "retrieval_hit": false,
+      "answer": "The three Deathly Hallows are the Elder Wand, the Resurrection Stone, and the Invisibility Cloak. According to legend, these objects were created by Death and given to the Peverell brothers. The Elder Wand is described as the most powerful wand in existence. The Resurrection Stone has the power to recall the dead as shades. The Invisibility Cloak is unique in its ability to render the wearer truly invisible without degradation over time.",
+      "reason": "The agent correctly identified the three Deathly Hallows. It also provided additional, relevant information about their origins and powers, which aligns with the spirit of the question, although not strictly required by the reference answer.",
+      "latency_s": 0.5028168680146337
+    },
+    {
+      "id": "q3",
+      "kind": "easy",
+      "correct": false,
+      "retrieval_hit": false,
+      "answer": "The provided text does not contain the incantation for the Patronus Charm. It mentions that Hermione Granger's Patronus took the form of an otter, Harry Potter had a stag Patronus, and that Patronus messengers were used by the Order of the Phoenix.",
+      "reason": "The agent incorrectly states that the incantation is not present, when it is clearly stated in the reference answer.",
+      "latency_s": 0.8271402450045571
+    },
+    {
+      "id": "q4",
+      "kind": "easy",
+      "correct": true,
+      "retrieval_hit": true,
+      "answer": "Lord Voldemort created seven Horcruxes to achieve immortality. This involved splitting his soul into seven pieces: six were placed into Horcruxes, and the seventh piece remained within his body. The seven Horcruxes were: Tom Riddle's diary, Marvolo Gaunt's ring, Slytherin's locket, Hufflepuff's cup, Ravenclaw's diadem, Nagini the snake, and unknowingly, Harry Potter himself.",
+      "reason": "The agent correctly states that Voldemort created seven Horcruxes, and also lists them all, including Harry Potter as the unintentional one. This aligns with the reference answer.",
+      "latency_s": 0.5482410640106536
+    },
+    {
+      "id": "q5",
+      "kind": "easy",
+      "correct": false,
+      "retrieval_hit": false,
+      "answer": "I am sorry, but the provided context does not contain information about the location of Diagon Alley.",
+      "reason": "judge parse failure: {\"correct\": false, \"reason\": \"The agent incorrectly stated that the information was not available in the provided contex",
+      "latency_s": 0.4906771569803823
+    },
+    {
+      "id": "q6",
+      "kind": "easy",
+      "correct": true,
+      "retrieval_hit": false,
+      "answer": "Harry Potter's Patronus takes the form of a stag. This Patronus reflects his father's Animagus form.",
+      "reason": "The agent correctly identified the form of Harry Potter's Patronus as a stag and also correctly noted that it matches his father's Animagus form.",
+      "latency_s": 5.389780602010433
+    },
+    {
+      "id": "q7",
+      "kind": "multi",
+      "correct": true,
+      "retrieval_hit": false,
+      "answer": "Harry Potter's and Lord Voldemort's wands are considered \"brother wands\" because they share the same core: a feather from the same phoenix, Fawkes. Ollivander, the wandmaker, revealed that Fawkes gave another of his feathers, and this feather was used to make Voldemort's wand. This unique connection means that the wands are extraordinarily closely matched and that one wand would perform exceptionally in the presence of the other.",
+      "reason": "The agent correctly identifies that both wands contain feathers from the same phoenix, Fawkes, which is the core reason for them being brother wands.",
+      "latency_s": 3.86632913997164
+    },
+    {
+      "id": "q8",
+      "kind": "multi",
+      "correct": false,
+      "retrieval_hit": true,
+      "answer": "The provided context does not explicitly state which dark wizard Albus Dumbledore defeated, nor does it detail how such a defeat related to the Elder Wand. While it mentions that Dumbledore wielded the Elder Wand and was the leader of the Order of the Phoenix, an organization dedicated to fighting Lord Voldemort, it does not describe a specific instance of him defeating a dark wizard with the wand. The text notes that Dumbledore possessed all three Deathly Hallows at one point and that he was ul",
+      "reason": "judge parse failure: {\"correct\": false, \"reason\": \"The agent incorrectly states that the reference answer does not contain the information. T",
+      "latency_s": 5.195044516003691
+    },
+    {
+      "id": "q9",
+      "kind": "multi",
+      "correct": true,
+      "retrieval_hit": true,
+      "answer": "Severus Snape's primary motivation for working against Lord Voldemort stemmed from his deep and lifelong love for Lily Evans (later Lily Potter). Although he was initially a Death Eater in his youth, he defected to Dumbledore's side specifically after Voldemort targeted Lily. Following Lily's death, Snape dedicated himself to a dual role, outwardly appearing loyal to Voldemort while secretly acting as a double agent for the Order of the Phoenix. This commitment continued until his death. His mem",
+      "reason": "The agent correctly identifies Snape's lifelong love for Lily Potter as his primary motivation for working against Voldemort.",
+      "latency_s": 1.9903025059902575
+    },
+    {
+      "id": "q10",
+      "kind": "multi",
+      "correct": false,
+      "retrieval_hit": true,
+      "answer": "Harry Potter was sorted into Gryffindor house at Hogwarts. While the provided context does not explicitly list the values that Gryffindor upholds, it mentions that students sorted into Gryffindor, such as Ron Weasley, have demonstrated traits like fierce loyalty, bravery, and sharp tactical instincts.",
+      "reason": "The agent did not state the values of Gryffindor, instead hedging by saying the context did not explicitly list them, despite the reference answer providing this information.",
+      "latency_s": 11.503858206997393
+    },
+    {
+      "id": "q11",
+      "kind": "distractor",
+      "correct": false,
+      "retrieval_hit": null,
+      "answer": "The provided context does not explicitly state who the Minister for Magic was during the Battle of Hogwarts. It mentions that Hermione Granger eventually became Minister for Magic, but this occurred after the Second Wizarding War.",
+      "reason": "The agent did not explicitly state that the corpus does not contain the information. Instead, it provided extra information that was not requested.",
+      "latency_s": 3.010196065006312
+    },
+    {
+      "id": "q12",
+      "kind": "distractor",
+      "correct": true,
+      "retrieval_hit": null,
+      "answer": "I am sorry, but the provided context does not contain information about the population of Hogsmeade village. The documents focus on Hogwarts School of Witchcraft and Wizardry, its students, teachers, and significant events in the wizarding world.",
+      "reason": "AGENT correctly states that the corpus does not contain the requested information.",
+      "latency_s": 1.8890069559856784
+    }
+  ]
+}

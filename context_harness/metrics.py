@@ -45,6 +45,103 @@ def deep_research_strict_metric(example, pred, trace=None) -> bool:
     return expected.issubset(actual) if expected else True
 
 
+# Refusal phrases — signals the agent declined to answer
+_REFUSAL_PHRASES = (
+    "does not contain",
+    "i don't know",
+    "not available",
+    "cannot answer",
+    "no information",
+    "not mentioned",
+    "i'm sorry, but the provided",
+    "the provided context does not",
+)
+
+
+def _is_refusal(text: str) -> bool:
+    lower = text.lower()
+    return any(phrase in lower for phrase in _REFUSAL_PHRASES)
+
+
+def deep_research_balanced_metric(example, pred, trace=None) -> bool:
+    """
+    Balanced metric that checks both precision (citations) and recall (no
+    false refusals). Penalises the agent for refusing to answer non-distractor
+    questions, even if citation accuracy is perfect.
+
+    True when:
+      1. Citation overlap >= 50% (or no citations expected)
+      2. Agent did NOT refuse on a non-distractor question
+      3. Answer is non-trivial (>30 chars)
+    """
+    answer = getattr(pred, "answer", "") or ""
+    kind = getattr(example, "kind", "easy")
+
+    # Citation check (precision)
+    expected = _tokens(getattr(example, "citations", ""))
+    actual = _tokens(getattr(pred, "citations", ""))
+    if expected:
+        overlap = len(expected & actual)
+        if overlap < (len(expected) + 1) // 2:
+            return False
+
+    # Refusal penalty (recall) — only for non-distractor questions
+    if _is_refusal(answer) and kind != "distractor":
+        return False
+
+    # Trivially short answers aren't useful
+    if len(answer) < 30:
+        return False
+
+    return True
+
+
+def deep_research_score(example, pred, trace=None) -> float:
+    """
+    Continuous 0.0–1.0 score for ranking. Gives the optimizer more signal
+    than binary pass/fail.
+
+    Components:
+      0.4 — citation overlap ratio
+      0.3 — non-refusal on answerable questions (or refusal on distractors)
+      0.2 — answer length (30-500 chars sweet spot)
+      0.1 — confidence is stated
+    """
+    score = 0.0
+    answer = getattr(pred, "answer", "") or ""
+    kind = getattr(example, "kind", "easy")
+
+    # Citation overlap (0.4)
+    expected = _tokens(getattr(example, "citations", ""))
+    actual = _tokens(getattr(pred, "citations", ""))
+    if expected:
+        overlap = len(expected & actual) / len(expected)
+        score += 0.4 * overlap
+    else:
+        score += 0.4  # no citations expected — full marks
+
+    # Refusal appropriateness (0.3)
+    refused = _is_refusal(answer)
+    if kind == "distractor" and refused:
+        score += 0.3  # correctly refused
+    elif kind != "distractor" and not refused:
+        score += 0.3  # correctly answered
+    # else: wrong behavior, 0 points
+
+    # Answer length (0.2)
+    if 30 <= len(answer) <= 500:
+        score += 0.2
+    elif len(answer) > 500:
+        score += 0.1  # verbose but still useful
+
+    # Confidence stated (0.1)
+    confidence = getattr(pred, "confidence", "") or ""
+    if confidence.strip().lower() in ("low", "medium", "high"):
+        score += 0.1
+
+    return score
+
+
 # ---------------------------------------------------------------------------
 # Guided Learning — Socratic score
 # ---------------------------------------------------------------------------
