@@ -150,3 +150,48 @@ sbt test         # runs munit-cats-effect suites
   not silent wrong answers at query time.
 - **Targeted cache invalidation** — the cache knows which collection changed; it does
   not flush everything on every write.
+
+---
+
+## DSPy mode playbook — Signature is canonical
+
+When adding or modifying a DSPy mode, the Signature's `InputField` names are the
+single source of truth. Every other place that names an input must use the
+**identical string** — no aliasing, no renaming.
+
+### Rule
+
+1. **Signature** declares the input field names (canonical).
+2. **Module.forward()** parameter names match the Signature's input field names
+   verbatim. No renaming inside `forward()`.
+3. **Trainset `.with_inputs(...)`** uses the identical strings.
+4. **Router** (`DSPyAgent.forward`) dispatches by introspecting the Signature's
+   first non-`context` input field — it does not hardcode `question=`. See
+   `_primary_input_field()` in `context_harness/dspy_agent.py`.
+
+### Why
+
+On 2026-04-17 we hit `TypeError: DebateModule.forward() got an unexpected keyword
+argument 'position'` during `optimizer.compile()`. Root cause: three places named
+the input (Signature=`position`, trainset=`.with_inputs("position")`,
+Module.forward=`question`), and the module renamed internally. That works for
+the runtime path but breaks the compile path, because
+`BootstrapFewShot.compile()` calls `teacher(**example.inputs())` — it echoes
+whatever `.with_inputs(...)` declared. Hiding a mismatch inside the callee only
+hides which caller is broken.
+
+### Checklist for adding a new mode
+
+- [ ] Signature defined (names input fields)
+- [ ] Module: `forward()` params match Signature input fields verbatim
+- [ ] Trainset: `.with_inputs(...)` uses identical strings
+- [ ] Metric function added to `context_harness/metrics.py`
+- [ ] `MODE_CONFIG` entry in `evals/slo_check.py`
+- [ ] Compile smoke test in `tests/test_compile_smoke.py` (asserts the mode
+      survives `BootstrapFewShot.compile(...)` under `DummyLM`)
+
+### Known gap (as of 2026-04-17)
+
+`slo_check.MODE_CONFIG` wires only `deep_research`, `guided_learning`, `debate`.
+Four modes (`satirical_podcast`, `perspective_shift`, `open_analysis`,
+`exam_grader`) are not yet gated — add them when their EVALSETs stabilise.
