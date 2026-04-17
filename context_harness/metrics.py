@@ -14,6 +14,7 @@ produces a weak agent. Put effort here.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Iterable
 
 
@@ -179,6 +180,56 @@ def exam_grader_metric(example, pred, trace=None) -> bool:
     if len(critique) < 20:
         return False
     return True
+
+
+# ---------------------------------------------------------------------------
+# Satirical Podcast — transcript structure + canon grounding
+# ---------------------------------------------------------------------------
+
+def satirical_podcast_metric(example, pred, trace=None) -> bool:
+    """
+    True when all of:
+      1. transcript is substantial (≥ 150 chars)
+      2. transcript contains at least 3 dialogue lines formatted as "Name: text"
+      3. comedic_tension is non-trivial (≥ 20 chars)
+      4. citations field is non-empty (at least one canon doc referenced)
+
+    Note: we deliberately do NOT check funniness — that requires an LLM judge.
+    This metric guards structure and canon grounding only.
+    """
+    transcript       = (getattr(pred, "transcript",       "") or "").strip()
+    comedic_tension  = (getattr(pred, "comedic_tension",  "") or "").strip()
+    citations        = (getattr(pred, "citations",        "") or "").strip()
+
+    if len(transcript) < 150:
+        return False
+    if len(comedic_tension) < 20:
+        return False
+    if not citations or citations.lower() == "none":
+        return False
+    # At least 3 "Speaker: dialogue" lines
+    dialogue_lines = re.findall(r"^\s*\w[\w\s]*:\s+\S", transcript, re.MULTILINE)
+    if len(dialogue_lines) < 3:
+        return False
+    return True
+
+
+def satirical_podcast_score(example, pred, trace=None) -> float:
+    """Continuous variant — 0.0 → 1.0 for optimizer ranking."""
+    score = 0.0
+    transcript      = (getattr(pred, "transcript",      "") or "").strip()
+    comedic_tension = (getattr(pred, "comedic_tension", "") or "").strip()
+    citations       = (getattr(pred, "citations",       "") or "").strip()
+
+    dialogue_lines = re.findall(r"^\s*\w[\w\s]*:\s+\S", transcript, re.MULTILINE)
+
+    if len(transcript)      >= 150: score += 0.3
+    if len(dialogue_lines)  >= 3:   score += 0.3
+    if len(comedic_tension) >= 20:  score += 0.2
+    if citations and citations.lower() != "none":
+        score += 0.2
+
+    return score
 
 
 # ---------------------------------------------------------------------------

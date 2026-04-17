@@ -143,6 +143,23 @@ class DebateSignature(dspy.Signature):
     citations:         str = dspy.OutputField(desc="space-separated doc_ids used across both sides of the argument")
 
 
+class SatiricalPodcastSignature(dspy.Signature):
+    """Generate a short satirical podcast transcript where two opinionated hosts
+    discuss a Harry Potter topic through a modern, mundane lens. Ground magical
+    elements in real canon facts from context, then subvert them with contemporary
+    absurdity — consumerism, influencer culture, gig economy, dating apps, social
+    status anxiety. The comedy lives in the collision between the fantastical and
+    the embarrassingly relatable. Dark humour is welcome; stay grounded in canon."""
+
+    topic:        str = dspy.InputField(desc="the HP magical topic or scenario being satirised")
+    modern_angle: str = dspy.InputField(desc="the mundane contemporary lens, e.g. 'online marketplace', 'dating app ethics', 'gig economy labour rights'")
+    context:      str = dspy.InputField(desc="retrieved lore passages, each prefixed [doc_id]")
+
+    transcript:      str = dspy.OutputField(desc="podcast dialogue of 4-8 exchanges between two named hosts — each line formatted as 'Name: dialogue'. Must weave in specific canon facts and apply the modern_angle for comedic effect.")
+    comedic_tension: str = dspy.OutputField(desc="one sentence: the central absurdity being exploited — what makes this magical element ridiculous through the modern lens")
+    citations:       str = dspy.OutputField(desc="space-separated doc_ids used for canon grounding")
+
+
 # ---------------------------------------------------------------------------
 # Modules
 # ---------------------------------------------------------------------------
@@ -266,11 +283,37 @@ class DebateModule(dspy.Module):
         return self.predict(position=question, context=context)
 
 
+class SatiricalPodcastModule(dspy.Module):
+    """
+    Moderate retrieval (k=6) + ChainOfThought over SatiricalPodcastSignature.
+    Retrieves on the topic to ground the script in real canon, then the LLM
+    applies the modern_angle for satirical effect.
+    Optimizer metric: dialogue structure + substance + canon citation present.
+    """
+
+    def __init__(self, pipeline: RAGPipeline, k: int = 6) -> None:
+        super().__init__()
+        self._pipeline = pipeline
+        self._k = k
+        self.predict = dspy.ChainOfThought(SatiricalPodcastSignature)
+
+    def forward(
+        self,
+        question: str,
+        modern_angle: str = "modern life",
+        user_profile: Optional[Dict[str, Any]] = None,
+    ) -> dspy.Prediction:
+        chunks = self._pipeline.retrieve(question, top_k=self._k)
+        context = "\n\n".join(f"[{c.doc_id}] {c.text}" for c in chunks) or "No context retrieved."
+        return self.predict(topic=question, modern_angle=modern_angle, context=context)
+
+
 # ---------------------------------------------------------------------------
 # Agent — mode router
 # ---------------------------------------------------------------------------
 
-MODES = {"deep_research", "guided_learning", "exam_grader", "open_analysis", "perspective_shift", "debate"}
+MODES = {"deep_research", "guided_learning", "exam_grader", "open_analysis",
+         "perspective_shift", "debate", "satirical_podcast"}
 
 
 class DSPyAgent:
@@ -299,7 +342,8 @@ class DSPyAgent:
             "exam_grader":     ExamGraderModule(pipeline, k=5),
             "open_analysis":   OpenAnalysisModule(pipeline, k=7),
             "perspective_shift": PerspectiveShiftModule(pipeline, k=5),
-            "debate":          DebateModule(pipeline, k=7),
+            "debate":            DebateModule(pipeline, k=7),
+            "satirical_podcast": SatiricalPodcastModule(pipeline, k=6),
         }
         if export_dir:
             self._load(Path(export_dir))
@@ -365,6 +409,12 @@ class DSPyAgent:
         """Run the optimizer on the debate module and update in place."""
         self._modules["debate"] = optimizer.compile(
             self._modules["debate"], trainset=trainset
+        )
+
+    def compile_satirical_podcast(self, optimizer: dspy.teleprompt.Teleprompter, trainset: list) -> None:
+        """Run the optimizer on the satirical_podcast module and update in place."""
+        self._modules["satirical_podcast"] = optimizer.compile(
+            self._modules["satirical_podcast"], trainset=trainset
         )
 
 
