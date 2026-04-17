@@ -78,12 +78,29 @@ class PerspectiveShiftSignature(dspy.Signature):
 
     scenario:  str = dspy.InputField(desc="the real-world situation or question")
     character: str = dspy.InputField(desc="the HP character whose perspective to apply")
-    context:   str = dspy.InputField(desc="retrieved lore about this character, each prefixed [doc_id]")
+    context:   str = dspy.InputField(desc="retrieved lore passages about this character, each prefixed [doc_id]")
 
-    character_principle: str = dspy.OutputField(desc="the core principle or philosophy this character embodies, grounded in specific canon events")
-    applied_insight:     str = dspy.OutputField(desc="how this principle applies to the user's real-world scenario — specific, actionable, not generic")
-    reasoning:           str = dspy.OutputField(desc="the bridge: why this character's experience maps to this situation")
-    citations:           str = dspy.OutputField(desc="space-separated doc_ids used for character grounding")
+    character_principle: str = dspy.OutputField(
+        desc=("2-3 sentences. The core principle this character embodies, anchored "
+              "in a specific canon event or decision. Do NOT list traits or give a "
+              "summary of the character — name the one lesson their life teaches.")
+    )
+    applied_insight: str = dspy.OutputField(
+        desc=("3-4 sentences (roughly 60-90 words). A direct, actionable insight "
+              "for the user's scenario. Name a concrete action or stance they can "
+              "take this week. Avoid hedging ('it's important to...', 'you might "
+              "consider...') and avoid restating the scenario.")
+    )
+    reasoning: str = dspy.OutputField(
+        desc=("1-2 sentences. The bridge: why THIS character's specific experience "
+              "maps to THIS scenario. Cite the connecting event, not a trait.")
+    )
+    citations: str = dspy.OutputField(
+        desc=("Space-separated doc_ids formatted as [doc-id], each in square "
+              "brackets. Use ONLY doc_ids that appear verbatim in the context "
+              "field. Do not invent or partially-spell doc_ids. Example: "
+              "'[severus-snape/biography-early-life-001] [severus-snape/personality-and-traits-002]'")
+    )
 
 
 class OpenAnalysisSignature(dspy.Signature):
