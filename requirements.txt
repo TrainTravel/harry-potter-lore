@@ -34,6 +34,7 @@ flatbuffers==25.12.19
 fsspec==2025.3.0
 gepa==0.0.26
 google-adk==0.0.1
+google-genai==1.73.0
 googleapis-common-protos==1.73.0
 graphlib-backport==1.1.0
 grpcio==1.70.0
@@ -60,6 +61,7 @@ matplotlib-inline==0.1.7
 mdurl==0.1.2
 mmh3==5.0.1
 mpmath==1.3.0
+mwparserfromhell==0.7.2
 nest-asyncio==1.6.0
 numpy==1.26.4
 oauthlib==3.3.1
