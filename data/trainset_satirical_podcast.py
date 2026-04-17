@@ -114,6 +114,56 @@ TRAINSET = [
         modern_angle="private prison industry and corporate-run mental health facilities",
         citations="order-of-the-phoenix",
     ).with_inputs("topic", "modern_angle"),
+
+    # --- new batch: radio show / fan mail / internet culture ---
+
+    dspy.Example(
+        topic="healing potions brewed in Snape's dungeon for everyday ailments",
+        modern_angle="pharmaceutical industry direct-to-consumer ads and prescription drug pricing",
+        citations="severus-snape hogwarts",
+    ).with_inputs("topic", "modern_angle"),
+
+    dspy.Example(
+        topic="owl post delivery tracking and data plan bureaucracy",
+        modern_angle="mobile carrier hidden fees and 'unlimited' plan small print",
+        citations="hogwarts",
+    ).with_inputs("topic", "modern_angle"),
+
+    dspy.Example(
+        topic="Taylor Swift performing a concert at Hogwarts",
+        modern_angle="concert ticket scalping, Eras Tour chaos and celebrity stan culture",
+        citations="hogwarts",
+    ).with_inputs("topic", "modern_angle"),
+
+    dspy.Example(
+        topic="daily life inside Azkaban under Dementor supervision",
+        modern_angle="reality TV prison documentaries and inmate influencer accounts",
+        citations="order-of-the-phoenix harry-potter",
+    ).with_inputs("topic", "modern_angle"),
+
+    dspy.Example(
+        topic="Engorgio and shrinking charms used for cosmetic body modification",
+        modern_angle="plastic surgery culture, BBL trends and before-and-after content creators",
+        citations="hogwarts",
+    ).with_inputs("topic", "modern_angle"),
+
+    dspy.Example(
+        topic="a magical radio show answering listener fan mail",
+        modern_angle="podcast Q&A culture, parasocial relationships and Patreon perks",
+        citations="hogwarts order-of-the-phoenix",
+    ).with_inputs("topic", "modern_angle"),
+
+    dspy.Example(
+        topic="dark magic addiction and forced rehabilitation after the wizarding war",
+        modern_angle="wellness retreats, trauma therapy discourse and recovery influencers",
+        citations="lord-voldemort order-of-the-phoenix",
+    ).with_inputs("topic", "modern_angle"),
+
+    dspy.Example(
+        topic="wizard memes and magical internet culture on the wizarding web",
+        modern_angle="social media algorithms, viral content and chronically online humour",
+        citations="hogwarts",
+    ).with_inputs("topic", "modern_angle"),
 ]
 
 
@@ -150,5 +200,23 @@ EVALSET = [
         topic="Harry Potter being famous from birth for surviving a curse",
         modern_angle="nepotism babies and unearned celebrity culture",
         citations="harry-potter lord-voldemort",
+    ).with_inputs("topic", "modern_angle"),
+
+    dspy.Example(
+        topic="Azkaban inmates writing letters home after being released",
+        modern_angle="post-incarceration reintegration and LinkedIn job hunting",
+        citations="order-of-the-phoenix",
+    ).with_inputs("topic", "modern_angle"),
+
+    dspy.Example(
+        topic="magical radio DJs taking live calls from wizard listeners",
+        modern_angle="late-night talk radio parasocial intimacy and caller culture",
+        citations="hogwarts order-of-the-phoenix",
+    ).with_inputs("topic", "modern_angle"),
+
+    dspy.Example(
+        topic="Madam Pomfrey's hospital wing versus muggle A&E",
+        modern_angle="NHS waiting times and private healthcare price gouging",
+        citations="hogwarts",
     ).with_inputs("topic", "modern_angle"),
 ]
