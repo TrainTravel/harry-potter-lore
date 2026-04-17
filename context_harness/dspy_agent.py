@@ -76,8 +76,8 @@ class PerspectiveShiftSignature(dspy.Signature):
     about how those traits translate to practical advice or insight. Be specific
     and actionable — not generic motivational advice."""
 
-    character: str = dspy.InputField(desc="the HP character whose perspective to apply")
     scenario:  str = dspy.InputField(desc="the real-world situation or question")
+    character: str = dspy.InputField(desc="the HP character whose perspective to apply")
     context:   str = dspy.InputField(desc="retrieved lore about this character, each prefixed [doc_id]")
 
     character_principle: str = dspy.OutputField(desc="the core principle or philosophy this character embodies, grounded in specific canon events")
@@ -194,11 +194,11 @@ class PerspectiveShiftModule(dspy.Module):
         self._k = k
         self.predict = dspy.ChainOfThought(PerspectiveShiftSignature)
 
-    def forward(self, question: str, character: str = "Dumbledore", **kwargs) -> dspy.Prediction:
-        query = f"{character} {question}".strip()
+    def forward(self, scenario: str = "", character: str = "Dumbledore", **kwargs) -> dspy.Prediction:
+        query = f"{character} {scenario}".strip()
         chunks = self._pipeline.retrieve(query, top_k=self._k)
         context = "\n\n".join(f"[{c.doc_id}] {c.text}" for c in chunks) or "No context retrieved."
-        return self.predict(character=character, scenario=question, context=context)
+        return self.predict(character=character, scenario=scenario, context=context)
 
 
 class OpenAnalysisModule(dspy.Module):
@@ -277,10 +277,10 @@ class DebateModule(dspy.Module):
         self._k = k
         self.predict = dspy.ChainOfThought(DebateSignature)
 
-    def forward(self, question: str, user_profile: Optional[Dict[str, Any]] = None) -> dspy.Prediction:
-        chunks = self._pipeline.retrieve(question, top_k=self._k)
+    def forward(self, position: str = "", **kwargs) -> dspy.Prediction:
+        chunks = self._pipeline.retrieve(position, top_k=self._k)
         context = "\n\n".join(f"[{c.doc_id}] {c.text}" for c in chunks) or "No context retrieved."
-        return self.predict(position=question, context=context)
+        return self.predict(position=position, context=context)
 
 
 class SatiricalPodcastModule(dspy.Module):
@@ -299,13 +299,13 @@ class SatiricalPodcastModule(dspy.Module):
 
     def forward(
         self,
-        question: str,
+        topic: str = "",
         modern_angle: str = "modern life",
-        user_profile: Optional[Dict[str, Any]] = None,
+        **kwargs,
     ) -> dspy.Prediction:
-        chunks = self._pipeline.retrieve(question, top_k=self._k)
+        chunks = self._pipeline.retrieve(topic, top_k=self._k)
         context = "\n\n".join(f"[{c.doc_id}] {c.text}" for c in chunks) or "No context retrieved."
-        return self.predict(topic=question, modern_angle=modern_angle, context=context)
+        return self.predict(topic=topic, modern_angle=modern_angle, context=context)
 
 
 # ---------------------------------------------------------------------------
@@ -352,10 +352,22 @@ class DSPyAgent:
     # Inference
     # ------------------------------------------------------------------
 
-    def forward(self, mode: str, question: str, **kwargs) -> dspy.Prediction:
+    def forward(self, mode: str, text: str = "", **kwargs) -> dspy.Prediction:
+        """
+        Route a query to the correct mode.
+
+        `text` maps to the Signature's **primary** input field (the first
+        non-`context` input) via introspection. Secondary inputs — e.g.
+        `character`, `student_answer`, `past_attempts`, `modern_angle` — must
+        be passed as explicit kwargs.
+        """
         if mode not in MODES:
             raise ValueError(f"Unknown mode {mode!r}. Valid modes: {sorted(MODES)}")
-        return self._modules[mode].forward(question=question, **kwargs)
+        module = self._modules[mode]
+        primary = _primary_input_field(module)
+        if text and primary not in kwargs:
+            kwargs[primary] = text
+        return module.forward(**kwargs)
 
     # ------------------------------------------------------------------
     # Export / import
@@ -416,6 +428,28 @@ class DSPyAgent:
         self._modules["satirical_podcast"] = optimizer.compile(
             self._modules["satirical_podcast"], trainset=trainset
         )
+
+
+# ---------------------------------------------------------------------------
+# Router helpers
+# ---------------------------------------------------------------------------
+
+def _primary_input_field(module: dspy.Module) -> str:
+    """
+    Return the first non-`context` input field name from the module's Signature.
+
+    This is the canonical "user-facing" input — what the caller's positional
+    `text` argument maps to. Enforces the Signature-is-canonical rule: no
+    per-mode dispatch table, no aliasing — the Signature itself tells the
+    router where to put the text.
+    """
+    sig = module.predict.predictors()[0].signature
+    for name in sig.input_fields:
+        if name != "context":
+            return name
+    raise RuntimeError(
+        f"Signature for {type(module).__name__} has no primary input field"
+    )
 
 
 # ---------------------------------------------------------------------------
