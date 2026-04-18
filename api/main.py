@@ -64,10 +64,23 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from context_harness.conversation import ConversationStore
 from context_harness.cost_tracker import estimate_cost_usd
 from context_harness.dspy_agent import DSPyAgent
 from context_harness.ingest_lore import build_pipeline
 from context_harness.security import PromptGuard, InputValidator, OutputFilter
+
+# Modes that participate in multi-turn conversation (Phase 0).
+# Others remain one-shot; client can send `conversation_id` but it's ignored.
+_CHAT_MODES = {"open_analysis", "guided_learning"}
+_conversation_store: ConversationStore | None = None
+
+
+def _get_conversation_store() -> ConversationStore:
+    global _conversation_store
+    if _conversation_store is None:
+        _conversation_store = ConversationStore()
+    return _conversation_store
 
 # Security — validate at the boundary
 _prompt_guard = PromptGuard()
@@ -104,6 +117,10 @@ class AskRequest(BaseModel):
     collection_name: str = "hp_lore"
     provider: str = "gemini"
     api_key: str | None = None
+    # Phase 0 multi-turn: if present, tutor mode loads + appends session history.
+    # Other modes currently ignore it. Null / omitted = one-shot behaviour (old).
+    conversation_id: str | None = Field(default=None, description="Optional conversation thread id; only guided_learning uses it in Phase 0")
+    student_answer: str = Field(default="", description="Student's answer for exam_grader mode")
 
 
 class IngestRequest(BaseModel):
@@ -274,6 +291,22 @@ def ask(req: AskRequest) -> AskResponse:
         kwargs["student_answer"] = req.student_answer
     elif req.mode == "perspective_shift":
         kwargs["character"] = req.character
+
+    # Multi-turn: for eligible modes, load prior turns and inject as text.
+    # Ignored (silently) for one-shot modes — no need for the client to care.
+    conv_store: ConversationStore | None = None
+    if req.conversation_id and req.mode in _CHAT_MODES:
+        conv_store = _get_conversation_store()
+        history = conv_store.load_history(req.conversation_id, max_turns=5)
+        kwargs["chat_history"] = conv_store.format_for_llm(history, mode=req.mode)
+        conv_store.compact_if_needed(req.conversation_id)   # Phase 0: warn-only
+        _record(turn_id, "chat_history.loaded", {
+            "conversation_id": req.conversation_id,
+            "prior_turns": len(history.turns),
+            "has_summary": bool(history.summary),
+            "history_chars": len(kwargs["chat_history"]),
+        })
+
     with dspy.context(lm=lm):
         pred = agent.forward(req.mode, req.question, **kwargs)
     llm_ms = (time.perf_counter() - t_llm) * 1000
@@ -321,6 +354,36 @@ def ask(req: AskRequest) -> AskResponse:
     output_check = _output_filter.scan(answer)
     if output_check.should_block:
         answer = _output_filter.safe_fallback()
+
+    # Multi-turn: persist this exchange for future turns in the same conversation.
+    # We save the raw structured prediction (not the formatted answer string) so
+    # downstream formatters can pick different fields per mode.
+    if conv_store is not None and req.conversation_id:
+        # pred might be a dspy.Prediction — materialise the fields we care about.
+        pred_dict = {
+            k: getattr(pred, k, None)
+            for k in ("answer", "analysis", "corpus_facts", "own_reasoning",
+                      "hint", "next_question", "explanation", "citations")
+            if getattr(pred, k, None) is not None
+        }
+        try:
+            turn_idx = conv_store.save_turn(
+                conversation_id=req.conversation_id,
+                user_message=req.question,
+                agent_response=pred_dict,
+                mode=req.mode,
+                character=(req.character if req.mode == "perspective_shift" else None),
+                tokens_in=locals().get("tokens_in", 0) or 0,
+                tokens_out=locals().get("tokens_out", 0) or 0,
+                cost_usd=cost_usd,
+            )
+            _record(turn_id, "chat_history.saved", {
+                "conversation_id": req.conversation_id,
+                "turn_index": turn_idx,
+            })
+        except Exception as exc:
+            # Save failures should never block the response — log and move on.
+            _record(turn_id, "chat_history.save_failed", {"error": str(exc)})
 
     _record(turn_id, "turn.end", {"cost_usd": cost_usd})
 
