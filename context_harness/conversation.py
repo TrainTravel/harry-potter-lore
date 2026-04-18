@@ -43,7 +43,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Protocol
 
 import duckdb
 
@@ -53,8 +53,106 @@ log = logging.getLogger(__name__)
 
 DEFAULT_DB_PATH = "data/traces.duckdb"
 
-# Phase 0: log a warning when we blow past this; don't actually compact yet.
+# Compact once a conversation exceeds this many turns. Keep the most recent
+# DEFAULT_KEEP_RECENT verbatim; summarise everything older into a single
+# rolling summary. Tunable — see evals/compaction_threshold_experiment.py.
 DEFAULT_COMPACTION_THRESHOLD = 8
+DEFAULT_KEEP_RECENT = 5
+
+
+# Mode-aware summarization prompts — preserve what the NEXT turn needs to
+# know. For guided_learning: the student's evolving understanding. For
+# open_analysis: the thesis + established facts. For perspective_shift:
+# the character lens + principle already surfaced.
+_SUMMARIZER_PROMPTS: dict[str, str] = {
+    "guided_learning": (
+        "Summarize this tutor-student dialogue in 2-3 sentences. Preserve:\n"
+        "  - what concept or problem the student is working on\n"
+        "  - their current level of understanding (grasp vs struggle)\n"
+        "  - what the tutor has already explained (to avoid repetition)\n"
+        "Do NOT include the tutor's exact phrasing or hints — only the "
+        "conceptual content. Write in third person.\n\n"
+        "Dialogue:\n{dialogue}\n\n"
+        "Summary:"
+    ),
+    "open_analysis": (
+        "Summarize this analytical dialogue in 2-3 sentences. Preserve:\n"
+        "  - the core thesis or question being explored\n"
+        "  - the corpus facts already established\n"
+        "  - the angle of the user's follow-up questions\n"
+        "Do NOT paraphrase the analysis itself — only capture what ground "
+        "has been covered. Write in third person.\n\n"
+        "Dialogue:\n{dialogue}\n\n"
+        "Summary:"
+    ),
+    "perspective_shift": (
+        "Summarize this character-lens conversation in 2-3 sentences. Preserve:\n"
+        "  - which HP character's perspective is being applied\n"
+        "  - the user's real-world scenario\n"
+        "  - the principle(s) or insight(s) already surfaced\n"
+        "Do NOT repeat applied-insight verbatim — capture the theme. "
+        "Write in third person.\n\n"
+        "Dialogue:\n{dialogue}\n\n"
+        "Summary:"
+    ),
+}
+_GENERIC_SUMMARIZER_PROMPT = (
+    "Summarize this dialogue in 2-3 sentences, preserving the key points "
+    "and the thread of what's been discussed.\n\n"
+    "Dialogue:\n{dialogue}\n\n"
+    "Summary:"
+)
+
+
+# ---------------------------------------------------------------------------
+# Summarizer Protocol — inject a client for testability
+# ---------------------------------------------------------------------------
+
+class Summarizer(Protocol):
+    """Anything that turns a prompt into a summary string.
+
+    Mirrors the same Protocol-based injection pattern as lore-builder's
+    tagger — keeps ConversationStore decoupled from any specific LLM SDK,
+    makes testing with a FakeSummarizer trivial.
+    """
+    def summarize(self, prompt: str) -> str:
+        ...
+
+
+class GeminiSummarizer:
+    """Default production summarizer. Uses Gemini 2.5 Flash-lite unless
+    overridden via the ``model`` arg. max_output_tokens bounded to 200
+    so summaries can't balloon past the expected 80-120 word target."""
+
+    def __init__(self, model: str = "gemini-2.5-flash-lite",
+                 api_key: Optional[str] = None,
+                 max_output_tokens: int = 200) -> None:
+        self._model = model
+        self._api_key = api_key
+        self._max_output_tokens = max_output_tokens
+        self._client = None  # lazy
+
+    def _get_client(self):
+        if self._client is None:
+            from google import genai
+            import os as _os
+            key = (self._api_key
+                   or _os.environ.get("GEMINI_API_KEY")
+                   or _os.environ.get("GOOGLE_API_KEY"))
+            self._client = genai.Client(api_key=key)
+        return self._client
+
+    def summarize(self, prompt: str) -> str:
+        from google.genai import types
+        resp = self._get_client().models.generate_content(
+            model=self._model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.3,
+                max_output_tokens=self._max_output_tokens,
+            ),
+        )
+        return (resp.text or "").strip()
 
 
 # ---------------------------------------------------------------------------
@@ -251,25 +349,126 @@ class ConversationStore:
     def compact_if_needed(
         self,
         conversation_id: str,
+        summarizer: "Summarizer | None" = None,
         threshold: int = DEFAULT_COMPACTION_THRESHOLD,
-    ) -> None:
-        """Phase 0 stub — logs a warning when a conversation exceeds the
-        threshold but does NOT actually summarise. Phase 1 wires in the
-        summariser from context_harness.summarizer.
+        keep_recent: int = DEFAULT_KEEP_RECENT,
+    ) -> bool:
+        """Run compaction if the conversation has crossed the threshold.
 
-        We expose the method now so call sites can reference it; the
-        no-op keeps the plumbing stable when the real implementation lands.
+        If ``summarizer`` is None, this remains a no-op (backwards-compatible
+        Phase 0 behaviour — useful for call sites that want threshold-aware
+        plumbing without the LLM dependency yet).
+
+        Returns True if compaction ran + a summary was written, False otherwise.
+        Never raises — failures are logged and the conversation continues with
+        its raw history.
         """
         count = self._conn.execute(
             "SELECT COUNT(*) FROM conversations WHERE conversation_id = ?",
             (conversation_id,),
         ).fetchone()[0]
-        if count > threshold:
+        if count <= threshold:
+            return False
+
+        if summarizer is None:
             log.warning(
-                "Conversation %s has %d turns (threshold %d). Compaction "
-                "not yet implemented — history will keep growing.",
+                "Conversation %s has %d turns (threshold %d). No summarizer "
+                "provided — skipping compaction.",
                 conversation_id, count, threshold,
             )
+            return False
+
+        try:
+            return self._summarize_and_store(conversation_id, summarizer, keep_recent)
+        except Exception as exc:
+            # Never break the surrounding turn flow on summary failure
+            log.error("Compaction failed for %s: %s", conversation_id, exc)
+            return False
+
+    def _summarize_and_store(
+        self,
+        conversation_id: str,
+        summarizer: "Summarizer",
+        keep_recent: int,
+    ) -> bool:
+        """Read prior summary (if any) + turns to compact, call summarizer,
+        INSERT a new summary row. Caller handles all exceptions."""
+        # Find the boundary: turns [1 .. N - keep_recent] get folded into
+        # the new summary. Turns (N - keep_recent + 1) .. N stay verbatim.
+        row = self._conn.execute(
+            "SELECT MAX(turn_index) FROM conversations WHERE conversation_id = ?",
+            (conversation_id,),
+        ).fetchone()
+        if not row or row[0] is None:
+            return False
+        max_turn = int(row[0])
+        compact_up_to = max_turn - keep_recent
+        if compact_up_to < 1:
+            return False
+
+        # Existing summary, if any — we'll regenerate including anything since
+        prior_summary_row = self._conn.execute(
+            "SELECT up_to_turn, summary FROM conversation_summaries "
+            "WHERE conversation_id = ? ORDER BY up_to_turn DESC LIMIT 1",
+            (conversation_id,),
+        ).fetchone()
+        prior_up_to = int(prior_summary_row[0]) if prior_summary_row else 0
+        prior_summary = str(prior_summary_row[1]) if prior_summary_row else ""
+
+        # Grab the turns to fold in: the window between the prior summary's
+        # up_to_turn and the new compact_up_to
+        turns_to_fold = self._conn.execute(
+            """SELECT turn_index, user_message, agent_response, mode
+               FROM conversations
+               WHERE conversation_id = ? AND turn_index > ? AND turn_index <= ?
+               ORDER BY turn_index ASC""",
+            (conversation_id, prior_up_to, compact_up_to),
+        ).fetchall()
+        if not turns_to_fold:
+            return False
+
+        # Pick a mode for prompt selection — use the most common mode in the
+        # window (conversations tend to stay single-mode, but hedge for mixed)
+        mode_counts: dict[str, int] = {}
+        for r in turns_to_fold:
+            mode_counts[str(r[3])] = mode_counts.get(str(r[3]), 0) + 1
+        dominant_mode = max(mode_counts, key=mode_counts.get) if mode_counts else ""
+        prompt_template = _SUMMARIZER_PROMPTS.get(
+            dominant_mode, _GENERIC_SUMMARIZER_PROMPT
+        )
+
+        # Format the window + prior summary into a single dialogue string
+        dialogue_parts: list[str] = []
+        if prior_summary:
+            dialogue_parts.append(f"[Earlier summary]: {prior_summary}")
+        for r in turns_to_fold:
+            idx, user_msg, agent_json, mode_ = int(r[0]), str(r[1]), r[2], str(r[3])
+            agent_dict = json.loads(agent_json) if agent_json else {}
+            agent_text = _format_agent_response(agent_dict, mode_)
+            dialogue_parts.append(f"[{idx}] User: {user_msg}")
+            if agent_text:
+                dialogue_parts.append(f"     Agent: {agent_text}")
+        dialogue = "\n".join(dialogue_parts)
+
+        prompt = prompt_template.format(dialogue=dialogue)
+        summary = summarizer.summarize(prompt)
+
+        # Sanity check — discard garbled or empty outputs
+        word_count = len(summary.split())
+        if not summary or word_count < 20 or word_count > 300:
+            log.warning(
+                "Compaction for %s produced unusable summary (%d words). Discarding.",
+                conversation_id, word_count,
+            )
+            return False
+
+        self._conn.execute(
+            "INSERT OR REPLACE INTO conversation_summaries "
+            "(conversation_id, up_to_turn, summary, created_at) "
+            "VALUES (?, ?, ?, ?)",
+            (conversation_id, compact_up_to, summary, time.time()),
+        )
+        return True
 
     # ------------------------------------------------------------------
     # Observability helpers

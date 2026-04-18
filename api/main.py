@@ -60,11 +60,16 @@ def _patched_completion(*args, **kwargs):
             else:
                 raise
 litellm.completion = _patched_completion
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from context_harness.conversation import ConversationStore
+from context_harness.conversation import (
+    ConversationStore,
+    GeminiSummarizer,
+    DEFAULT_COMPACTION_THRESHOLD,
+    DEFAULT_KEEP_RECENT,
+)
 from context_harness.cost_tracker import estimate_cost_usd
 from context_harness.dspy_agent import DSPyAgent
 from context_harness.ingest_lore import build_pipeline
@@ -257,7 +262,7 @@ def ingest(req: IngestRequest) -> IngestResponse:
 
 
 @app.post("/ask", response_model=AskResponse)
-def ask(req: AskRequest) -> AskResponse:
+def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
     # --- Security: validate input at the boundary ---
     input_check = _input_validator.validate(req.question)
     if input_check.should_block:
@@ -294,12 +299,13 @@ def ask(req: AskRequest) -> AskResponse:
 
     # Multi-turn: for eligible modes, load prior turns and inject as text.
     # Ignored (silently) for one-shot modes — no need for the client to care.
+    # Compaction runs AFTER the response via BackgroundTasks so it never
+    # blocks the user-facing turn latency.
     conv_store: ConversationStore | None = None
     if req.conversation_id and req.mode in _CHAT_MODES:
         conv_store = _get_conversation_store()
-        history = conv_store.load_history(req.conversation_id, max_turns=5)
+        history = conv_store.load_history(req.conversation_id, max_turns=DEFAULT_KEEP_RECENT)
         kwargs["chat_history"] = conv_store.format_for_llm(history, mode=req.mode)
-        conv_store.compact_if_needed(req.conversation_id)   # Phase 0: warn-only
         _record(turn_id, "chat_history.loaded", {
             "conversation_id": req.conversation_id,
             "prior_turns": len(history.turns),
@@ -391,6 +397,24 @@ def ask(req: AskRequest) -> AskResponse:
                 "conversation_id": req.conversation_id,
                 "turn_index": turn_idx,
             })
+            # Schedule compaction AFTER the response is returned. BackgroundTasks
+            # runs once the response has been shipped to the client, so the user
+            # sees zero latency impact. If compaction fails, the conversation
+            # simply keeps growing raw until the next successful attempt.
+            def _run_compaction(cid: str, tid: str):
+                try:
+                    did_compact = conv_store.compact_if_needed(
+                        cid, summarizer=GeminiSummarizer(),
+                        threshold=DEFAULT_COMPACTION_THRESHOLD,
+                        keep_recent=DEFAULT_KEEP_RECENT,
+                    )
+                    if did_compact:
+                        _record(tid, "compaction.done", {"conversation_id": cid})
+                except Exception as exc:
+                    _record(tid, "compaction.failed", {
+                        "conversation_id": cid, "error": str(exc),
+                    })
+            background.add_task(_run_compaction, req.conversation_id, turn_id)
         except Exception as exc:
             # Save failures should never block the response — log and move on.
             _record(turn_id, "chat_history.save_failed", {"error": str(exc)})

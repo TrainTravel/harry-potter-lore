@@ -1,0 +1,826 @@
+{
+  "turns": 25,
+  "keep_recent": 5,
+  "results": [
+    {
+      "threshold": 6,
+      "turns_simulated": 25,
+      "keep_recent": 5,
+      "compaction_count": 19,
+      "summary_invocations": 19,
+      "max_history_chars": 3150,
+      "median_history_chars": 3120,
+      "min_history_chars": 527,
+      "final_history_chars": 3095,
+      "bounded_approx": true,
+      "per_turn": [
+        {
+          "turn": 1,
+          "history_chars": 527,
+          "verbatim_turns_in_history": 1,
+          "has_summary": false
+        },
+        {
+          "turn": 2,
+          "history_chars": 1057,
+          "verbatim_turns_in_history": 2,
+          "has_summary": false
+        },
+        {
+          "turn": 3,
+          "history_chars": 1614,
+          "verbatim_turns_in_history": 3,
+          "has_summary": false
+        },
+        {
+          "turn": 4,
+          "history_chars": 2144,
+          "verbatim_turns_in_history": 4,
+          "has_summary": false
+        },
+        {
+          "turn": 5,
+          "history_chars": 2677,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 6,
+          "history_chars": 2690,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 7,
+          "history_chars": 3143,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 8,
+          "history_chars": 3126,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 9,
+          "history_chars": 3137,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 10,
+          "history_chars": 3150,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 11,
+          "history_chars": 3147,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 12,
+          "history_chars": 3136,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 13,
+          "history_chars": 3127,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 14,
+          "history_chars": 3116,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 15,
+          "history_chars": 3120,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 16,
+          "history_chars": 3120,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 17,
+          "history_chars": 3148,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 18,
+          "history_chars": 3144,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 19,
+          "history_chars": 3147,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 20,
+          "history_chars": 3132,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 21,
+          "history_chars": 3117,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 22,
+          "history_chars": 3086,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 23,
+          "history_chars": 3086,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 24,
+          "history_chars": 3092,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 25,
+          "history_chars": 3095,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        }
+      ]
+    },
+    {
+      "threshold": 10,
+      "turns_simulated": 25,
+      "keep_recent": 5,
+      "compaction_count": 15,
+      "summary_invocations": 15,
+      "max_history_chars": 3148,
+      "median_history_chars": 3092,
+      "min_history_chars": 527,
+      "final_history_chars": 3095,
+      "bounded_approx": true,
+      "per_turn": [
+        {
+          "turn": 1,
+          "history_chars": 527,
+          "verbatim_turns_in_history": 1,
+          "has_summary": false
+        },
+        {
+          "turn": 2,
+          "history_chars": 1057,
+          "verbatim_turns_in_history": 2,
+          "has_summary": false
+        },
+        {
+          "turn": 3,
+          "history_chars": 1614,
+          "verbatim_turns_in_history": 3,
+          "has_summary": false
+        },
+        {
+          "turn": 4,
+          "history_chars": 2144,
+          "verbatim_turns_in_history": 4,
+          "has_summary": false
+        },
+        {
+          "turn": 5,
+          "history_chars": 2677,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 6,
+          "history_chars": 2690,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 7,
+          "history_chars": 2692,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 8,
+          "history_chars": 2675,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 9,
+          "history_chars": 2686,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 10,
+          "history_chars": 2699,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 11,
+          "history_chars": 3147,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 12,
+          "history_chars": 3136,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 13,
+          "history_chars": 3127,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 14,
+          "history_chars": 3116,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 15,
+          "history_chars": 3120,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 16,
+          "history_chars": 3120,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 17,
+          "history_chars": 3148,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 18,
+          "history_chars": 3144,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 19,
+          "history_chars": 3147,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 20,
+          "history_chars": 3132,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 21,
+          "history_chars": 3117,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 22,
+          "history_chars": 3086,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 23,
+          "history_chars": 3086,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 24,
+          "history_chars": 3092,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 25,
+          "history_chars": 3095,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        }
+      ]
+    },
+    {
+      "threshold": 12,
+      "turns_simulated": 25,
+      "keep_recent": 5,
+      "compaction_count": 13,
+      "summary_invocations": 13,
+      "max_history_chars": 3148,
+      "median_history_chars": 3086,
+      "min_history_chars": 527,
+      "final_history_chars": 3095,
+      "bounded_approx": true,
+      "per_turn": [
+        {
+          "turn": 1,
+          "history_chars": 527,
+          "verbatim_turns_in_history": 1,
+          "has_summary": false
+        },
+        {
+          "turn": 2,
+          "history_chars": 1057,
+          "verbatim_turns_in_history": 2,
+          "has_summary": false
+        },
+        {
+          "turn": 3,
+          "history_chars": 1614,
+          "verbatim_turns_in_history": 3,
+          "has_summary": false
+        },
+        {
+          "turn": 4,
+          "history_chars": 2144,
+          "verbatim_turns_in_history": 4,
+          "has_summary": false
+        },
+        {
+          "turn": 5,
+          "history_chars": 2677,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 6,
+          "history_chars": 2690,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 7,
+          "history_chars": 2692,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 8,
+          "history_chars": 2675,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 9,
+          "history_chars": 2686,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 10,
+          "history_chars": 2699,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 11,
+          "history_chars": 2696,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 12,
+          "history_chars": 2685,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 13,
+          "history_chars": 3127,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 14,
+          "history_chars": 3116,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 15,
+          "history_chars": 3120,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 16,
+          "history_chars": 3120,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 17,
+          "history_chars": 3148,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 18,
+          "history_chars": 3144,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 19,
+          "history_chars": 3147,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 20,
+          "history_chars": 3132,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 21,
+          "history_chars": 3117,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 22,
+          "history_chars": 3086,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 23,
+          "history_chars": 3086,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 24,
+          "history_chars": 3092,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 25,
+          "history_chars": 3095,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        }
+      ]
+    },
+    {
+      "threshold": 16,
+      "turns_simulated": 25,
+      "keep_recent": 5,
+      "compaction_count": 9,
+      "summary_invocations": 9,
+      "max_history_chars": 3148,
+      "median_history_chars": 2690,
+      "min_history_chars": 527,
+      "final_history_chars": 3095,
+      "bounded_approx": true,
+      "per_turn": [
+        {
+          "turn": 1,
+          "history_chars": 527,
+          "verbatim_turns_in_history": 1,
+          "has_summary": false
+        },
+        {
+          "turn": 2,
+          "history_chars": 1057,
+          "verbatim_turns_in_history": 2,
+          "has_summary": false
+        },
+        {
+          "turn": 3,
+          "history_chars": 1614,
+          "verbatim_turns_in_history": 3,
+          "has_summary": false
+        },
+        {
+          "turn": 4,
+          "history_chars": 2144,
+          "verbatim_turns_in_history": 4,
+          "has_summary": false
+        },
+        {
+          "turn": 5,
+          "history_chars": 2677,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 6,
+          "history_chars": 2690,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 7,
+          "history_chars": 2692,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 8,
+          "history_chars": 2675,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 9,
+          "history_chars": 2686,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 10,
+          "history_chars": 2699,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 11,
+          "history_chars": 2696,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 12,
+          "history_chars": 2685,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 13,
+          "history_chars": 2676,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 14,
+          "history_chars": 2665,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 15,
+          "history_chars": 2669,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 16,
+          "history_chars": 2669,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 17,
+          "history_chars": 3148,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 18,
+          "history_chars": 3144,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 19,
+          "history_chars": 3147,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 20,
+          "history_chars": 3132,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 21,
+          "history_chars": 3117,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 22,
+          "history_chars": 3086,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 23,
+          "history_chars": 3086,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 24,
+          "history_chars": 3092,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 25,
+          "history_chars": 3095,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        }
+      ]
+    },
+    {
+      "threshold": 20,
+      "turns_simulated": 25,
+      "keep_recent": 5,
+      "compaction_count": 5,
+      "summary_invocations": 5,
+      "max_history_chars": 3117,
+      "median_history_chars": 2686,
+      "min_history_chars": 527,
+      "final_history_chars": 3095,
+      "bounded_approx": true,
+      "per_turn": [
+        {
+          "turn": 1,
+          "history_chars": 527,
+          "verbatim_turns_in_history": 1,
+          "has_summary": false
+        },
+        {
+          "turn": 2,
+          "history_chars": 1057,
+          "verbatim_turns_in_history": 2,
+          "has_summary": false
+        },
+        {
+          "turn": 3,
+          "history_chars": 1614,
+          "verbatim_turns_in_history": 3,
+          "has_summary": false
+        },
+        {
+          "turn": 4,
+          "history_chars": 2144,
+          "verbatim_turns_in_history": 4,
+          "has_summary": false
+        },
+        {
+          "turn": 5,
+          "history_chars": 2677,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 6,
+          "history_chars": 2690,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 7,
+          "history_chars": 2692,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 8,
+          "history_chars": 2675,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 9,
+          "history_chars": 2686,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 10,
+          "history_chars": 2699,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 11,
+          "history_chars": 2696,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 12,
+          "history_chars": 2685,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 13,
+          "history_chars": 2676,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 14,
+          "history_chars": 2665,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 15,
+          "history_chars": 2669,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 16,
+          "history_chars": 2669,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 17,
+          "history_chars": 2697,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 18,
+          "history_chars": 2693,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 19,
+          "history_chars": 2696,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 20,
+          "history_chars": 2681,
+          "verbatim_turns_in_history": 5,
+          "has_summary": false
+        },
+        {
+          "turn": 21,
+          "history_chars": 3117,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 22,
+          "history_chars": 3086,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 23,
+          "history_chars": 3086,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 24,
+          "history_chars": 3092,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        },
+        {
+          "turn": 25,
+          "history_chars": 3095,
+          "verbatim_turns_in_history": 5,
+          "has_summary": true
+        }
+      ]
+    }
+  ]
+}

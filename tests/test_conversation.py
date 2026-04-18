@@ -170,6 +170,118 @@ def test_turn_costs_empty_conversation_returns_empty_list(store: ConversationSto
 
 
 # ---------------------------------------------------------------------------
+# Compaction — uses FakeSummarizer (no real LLM calls)
+# ---------------------------------------------------------------------------
+
+class FakeSummarizer:
+    """Deterministic summarizer for tests. Records prompts for inspection,
+    returns a scripted summary string per call."""
+    def __init__(self, summary: str = (
+        "The student has been exploring the concept of horcruxes and soul "
+        "fragmentation. The tutor has explained the basic mechanism and "
+        "the student is now asking follow-up questions about the ethics.")) -> None:
+        self._summary = summary
+        self.calls: list[str] = []
+
+    def summarize(self, prompt: str) -> str:
+        self.calls.append(prompt)
+        return self._summary
+
+
+def test_compaction_noop_below_threshold(store: ConversationStore):
+    for i in range(5):
+        store.save_turn("c1", f"q{i}", {"explanation": f"a{i}"}, "guided_learning")
+    summ = FakeSummarizer()
+    result = store.compact_if_needed("c1", summarizer=summ, threshold=8, keep_recent=5)
+    assert result is False
+    assert summ.calls == []
+
+
+def test_compaction_fires_when_above_threshold(store: ConversationStore):
+    for i in range(10):
+        store.save_turn("c1", f"q{i}", {"explanation": f"a{i}"}, "guided_learning")
+    summ = FakeSummarizer()
+    result = store.compact_if_needed("c1", summarizer=summ, threshold=8, keep_recent=5)
+    assert result is True
+    assert len(summ.calls) == 1
+
+
+def test_compaction_uses_mode_aware_prompt(store: ConversationStore):
+    for i in range(10):
+        store.save_turn("c1", f"q{i}", {"explanation": f"a{i}"}, "guided_learning")
+    summ = FakeSummarizer()
+    store.compact_if_needed("c1", summarizer=summ, threshold=8)
+    assert "tutor-student dialogue" in summ.calls[0]
+
+
+def test_compaction_rejects_garbled_summary(store: ConversationStore):
+    for i in range(10):
+        store.save_turn("c1", f"q{i}", {"explanation": f"a{i}"}, "guided_learning")
+    summ = FakeSummarizer(summary="too short")
+    result = store.compact_if_needed("c1", summarizer=summ, threshold=8)
+    assert result is False
+    history = store.load_history("c1", max_turns=20)
+    assert history.summary == ""
+
+
+def test_compaction_keeps_recent_turns_verbatim(store: ConversationStore):
+    for i in range(10):
+        store.save_turn("c1", f"q{i}", {"explanation": f"a{i}"}, "guided_learning")
+    summ = FakeSummarizer()
+    store.compact_if_needed("c1", summarizer=summ, threshold=8, keep_recent=5)
+    history = store.load_history("c1", max_turns=20)
+    assert history.summary != ""
+    # Verbatim turns are the last keep_recent=5 (indices 6-10)
+    assert [t.turn_index for t in history.turns] == [6, 7, 8, 9, 10]
+
+
+def test_compaction_is_fault_tolerant(store: ConversationStore):
+    for i in range(10):
+        store.save_turn("c1", f"q{i}", {"explanation": f"a{i}"}, "guided_learning")
+
+    class CrashingSummarizer:
+        def summarize(self, prompt: str) -> str:
+            raise RuntimeError("simulated LLM outage")
+
+    result = store.compact_if_needed("c1", summarizer=CrashingSummarizer(), threshold=8)
+    assert result is False
+    history = store.load_history("c1", max_turns=20)
+    assert history.summary == ""
+
+
+def test_compaction_none_summarizer_is_noop_at_any_count(store: ConversationStore):
+    for i in range(15):
+        store.save_turn("c1", f"q{i}", {"explanation": f"a{i}"}, "guided_learning")
+    result = store.compact_if_needed("c1", summarizer=None, threshold=8)
+    assert result is False
+
+
+def test_compaction_re_summarizes_including_prior_summary(store: ConversationStore):
+    """After a compaction exists and new turns arrive, the next compaction
+    should include the prior summary in its input so the new summary covers
+    the full span, not just the recent delta."""
+    for i in range(10):
+        store.save_turn("c1", f"q{i}", {"explanation": f"a{i}"}, "guided_learning")
+    summ1 = FakeSummarizer(summary=(
+        "First compaction covered the initial turns of the dialogue and "
+        "established that the student is learning about horcruxes, soul "
+        "fragmentation, and the basic ethical and magical implications "
+        "of immortality schemes."
+    ))
+    store.compact_if_needed("c1", summarizer=summ1, threshold=8, keep_recent=5)
+
+    # Add more turns, triggering a second compaction
+    for i in range(10, 14):
+        store.save_turn("c1", f"q{i}", {"explanation": f"a{i}"}, "guided_learning")
+    summ2 = FakeSummarizer(summary="Second summary covers turns 1 through 9 including horcruxes introduction and now the ethics of soul magic the student is asking about.")
+    store.compact_if_needed("c1", summarizer=summ2, threshold=8, keep_recent=5)
+
+    # The second summarizer's prompt must have included the first summary
+    assert "[Earlier summary]" in summ2.calls[0]
+    assert "First compaction" in summ2.calls[0]
+
+
+# ---------------------------------------------------------------------------
 # Mode-specific formatter fallback
 # ---------------------------------------------------------------------------
 
