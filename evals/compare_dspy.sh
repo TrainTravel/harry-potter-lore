@@ -1,46 +1,64 @@
 #!/usr/bin/env bash
 #
-# Compare DSPy compiled vs uncompiled agent accuracy
-# ===================================================
+# Compare DSPy compiled vs uncompiled agent accuracy (v2)
+# =======================================================
 # Runs eval_dspy.py twice (with and without compiled demos),
-# then prints a side-by-side comparison.
+# then prints a side-by-side comparison with statistical rigor.
 #
 # Usage:
-#   ./evals/compare_dspy.sh              # full eval (12 questions)
-#   ./evals/compare_dspy.sh --limit 5    # quick smoke test
+#   ./evals/compare_dspy.sh              # full eval, 1 run
+#   ./evals/compare_dspy.sh 5            # quick smoke test (5 questions)
+#   ./evals/compare_dspy.sh --runs 3     # 3 runs for significance
+#   ./evals/compare_dspy.sh 5 --runs 3   # both
 #
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 source .env 2>/dev/null || true
 
-LIMIT="${1:-}"
 LIMIT_FLAG=""
-if [ -n "$LIMIT" ]; then
-    LIMIT_FLAG="--limit ${LIMIT#--limit }"
-    # Handle both "./compare_dspy.sh --limit 5" and "./compare_dspy.sh 5"
-    if [[ "$LIMIT" =~ ^[0-9]+$ ]]; then
-        LIMIT_FLAG="--limit $LIMIT"
+RUNS_FLAG=""
+
+for arg in "$@"; do
+    if [[ "$arg" =~ ^[0-9]+$ ]]; then
+        LIMIT_FLAG="--limit $arg"
+    elif [[ "$arg" == "--runs" ]]; then
+        : # next arg is the count
+    elif [[ -n "${PREV_WAS_RUNS:-}" ]]; then
+        RUNS_FLAG="--runs $arg"
+        unset PREV_WAS_RUNS
     fi
+    [[ "$arg" == "--runs" ]] && PREV_WAS_RUNS=1
+done
+# Handle "--runs N" as two args
+if [[ -z "$RUNS_FLAG" ]]; then
+    for i in $(seq 1 $(($# - 1))); do
+        arg="${!i}"
+        next_i=$((i + 1))
+        next_arg="${!next_i}"
+        if [[ "$arg" == "--runs" ]]; then
+            RUNS_FLAG="--runs $next_arg"
+        fi
+    done
 fi
 
 echo "============================================="
-echo "  DSPy Compiled vs Uncompiled Comparison"
+echo "  DSPy Compiled vs Uncompiled Comparison (v2)"
 echo "============================================="
 echo ""
 
-# --- Run 1: Uncompiled (zero-shot) ---
-echo ">>> [1/2] Running UNCOMPILED eval (zero-shot)..."
+# --- Run 1: Uncompiled ---
+echo ">>> [1/2] Running UNCOMPILED eval..."
 .venv/bin/python -m evals.eval_dspy \
     --out evals/results_dspy_uncompiled.json \
-    $LIMIT_FLAG
+    $LIMIT_FLAG $RUNS_FLAG
 
 echo ""
-echo ">>> [2/2] Running COMPILED eval (with bootstrapped demos)..."
+echo ">>> [2/2] Running COMPILED eval..."
 .venv/bin/python -m evals.eval_dspy \
     --agent-dir my_profile.agent \
     --out evals/results_dspy_compiled.json \
-    $LIMIT_FLAG
+    $LIMIT_FLAG $RUNS_FLAG
 
 # --- Compare ---
 echo ""
@@ -54,60 +72,77 @@ import json
 u = json.load(open('evals/results_dspy_uncompiled.json'))
 c = json.load(open('evals/results_dspy_compiled.json'))
 
-u_acc = u['accuracy']
-c_acc = c['accuracy']
+u_acc = u['accuracy_mean']
+c_acc = c['accuracy_mean']
+u_std = u.get('accuracy_std', 0)
+c_std = c.get('accuracy_std', 0)
 diff = c_acc - u_acc
 
-print(f'')
-print(f'  Uncompiled accuracy: {u_acc:.1%}')
-print(f'  Compiled accuracy:   {c_acc:.1%}')
-print(f'  Delta:               {diff:+.1%}')
-print(f'')
+n_runs = u.get('runs', 1)
 
-# Per-kind breakdown
+print()
+if n_runs > 1:
+    print(f'  Uncompiled: {u_acc:.1%} ± {u_std:.1%}')
+    print(f'  Compiled:   {c_acc:.1%} ± {c_std:.1%}')
+else:
+    print(f'  Uncompiled: {u_acc:.1%}')
+    print(f'  Compiled:   {c_acc:.1%}')
+print(f'  Delta:      {diff:+.1%}')
+print()
+
+# Per-kind
 for label, data in [('Uncompiled', u), ('Compiled', c)]:
     by_kind = {}
-    for r in data['rows']:
-        k = r['kind']
-        by_kind.setdefault(k, [0, 0])
-        by_kind[k][0] += int(r['correct'])
-        by_kind[k][1] += 1
+    for qid, info in data['per_question'].items():
+        k = info['kind']
+        by_kind.setdefault(k, [])
+        by_kind[k].append(info['correct_rate'])
     print(f'  {label}:')
-    for k, (correct, total) in sorted(by_kind.items()):
-        print(f'    {k:11s} {correct}/{total}')
+    for k in sorted(by_kind):
+        rates = by_kind[k]
+        avg = sum(rates) / len(rates)
+        print(f'    {k:11s} {avg:.0%} ({len(rates)} qs)')
     print()
 
-# Per-question diff
-print('  Per-question changes:')
-u_by_id = {r['id']: r for r in u['rows']}
-c_by_id = {r['id']: r for r in c['rows']}
+# Latency
+print(f'  Latency (warmup excluded):')
+print(f'    Uncompiled: {u[\"mean_latency_s\"]:.1f}s')
+print(f'    Compiled:   {c[\"mean_latency_s\"]:.1f}s')
+lat_diff = (c['mean_latency_s'] - u['mean_latency_s']) / max(u['mean_latency_s'], 0.01)
+print(f'    Delta:      {lat_diff:+.0%}')
+print()
+
+# Retries
+print(f'  Structured-output retries:')
+print(f'    Uncompiled: {u[\"retry_rate\"]:.0%} of questions')
+print(f'    Compiled:   {c[\"retry_rate\"]:.0%} of questions')
+print()
+
+# Per-question regressions/fixes
+print(f'  Per-question changes:')
 changed = False
-for qid in u_by_id:
-    if qid in c_by_id:
-        uc = u_by_id[qid]['correct']
-        cc = c_by_id[qid]['correct']
-        if uc != cc:
+for qid in u['per_question']:
+    if qid in c['per_question']:
+        ur = u['per_question'][qid]['correct_rate']
+        cr = c['per_question'][qid]['correct_rate']
+        if abs(ur - cr) > 0.01:
             changed = True
-            arrow = 'FIXED' if cc else 'REGRESSED'
-            print(f'    {qid}: {arrow}')
+            if cr > ur:
+                print(f'    {qid}: IMPROVED ({ur:.0%} → {cr:.0%})')
+            else:
+                print(f'    {qid}: REGRESSED ({ur:.0%} → {cr:.0%})')
 if not changed:
     print(f'    (no changes)')
 
-# Latency
-u_lat = sum(r['latency_s'] for r in u['rows']) / len(u['rows'])
-c_lat = sum(r['latency_s'] for r in c['rows']) / len(c['rows'])
-print(f'')
-print(f'  Mean latency:')
-print(f'    Uncompiled: {u_lat:.1f}s')
-print(f'    Compiled:   {c_lat:.1f}s')
-
-if diff > 0:
-    print(f'')
+# Verdict
+print()
+if diff > 0.05:
     print(f'  VERDICT: Compiled demos improved accuracy by {diff:.1%}')
-elif diff < 0:
-    print(f'')
-    print(f'  VERDICT: Compiled demos HURT accuracy by {diff:.1%} — investigate metrics')
+elif diff < -0.05:
+    print(f'  VERDICT: Compiled demos HURT accuracy by {abs(diff):.1%} — review your metric')
 else:
-    print(f'')
-    print(f'  VERDICT: No accuracy difference — DSPy demos had no measurable effect')
+    print(f'  VERDICT: No significant accuracy difference ({diff:+.1%})')
+
+if c['retry_rate'] < u['retry_rate']:
+    print(f'  VERDICT: Compiled demos reduced retries ({u[\"retry_rate\"]:.0%} → {c[\"retry_rate\"]:.0%}) — likely explains latency improvement')
 "
