@@ -19,28 +19,34 @@ source .env 2>/dev/null || true
 LIMIT_FLAG=""
 RUNS_FLAG=""
 
-for arg in "$@"; do
-    if [[ "$arg" =~ ^[0-9]+$ ]]; then
-        LIMIT_FLAG="--limit $arg"
-    elif [[ "$arg" == "--runs" ]]; then
-        : # next arg is the count
-    elif [[ -n "${PREV_WAS_RUNS:-}" ]]; then
-        RUNS_FLAG="--runs $arg"
-        unset PREV_WAS_RUNS
-    fi
-    [[ "$arg" == "--runs" ]] && PREV_WAS_RUNS=1
+# Canonical bash arg parsing — single pass, handles both `--runs 3` and
+# `--runs=3`. The previous version used indirect expansion (${!i}) inside a
+# `seq` loop, which tripped on macOS's BSD seq (it counts down through
+# negative ranges) combined with `set -u`. This version is stable across
+# GNU and BSD userlands.
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --runs)
+            shift
+            RUNS_FLAG="--runs $1"
+            ;;
+        --runs=*)
+            RUNS_FLAG="--runs ${1#--runs=}"
+            ;;
+        [0-9]*)
+            LIMIT_FLAG="--limit $1"
+            ;;
+        -h|--help)
+            echo "Usage: $0 [LIMIT] [--runs N]" >&2
+            exit 0
+            ;;
+        *)
+            echo "unknown argument: $1" >&2
+            exit 1
+            ;;
+    esac
+    shift
 done
-# Handle "--runs N" as two args
-if [[ -z "$RUNS_FLAG" ]]; then
-    for i in $(seq 1 $(($# - 1))); do
-        arg="${!i}"
-        next_i=$((i + 1))
-        next_arg="${!next_i}"
-        if [[ "$arg" == "--runs" ]]; then
-            RUNS_FLAG="--runs $next_arg"
-        fi
-    done
-fi
 
 echo "============================================="
 echo "  DSPy Compiled vs Uncompiled Comparison (v2)"
