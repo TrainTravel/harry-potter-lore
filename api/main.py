@@ -335,15 +335,25 @@ def ask(req: AskRequest) -> AskResponse:
         answer = f"**Hint:** {hint}\n\n**Why it matters:** {explain}"
 
     # Best-effort cost estimate — dspy exposes usage on the underlying LM history.
-    # Pricing table is in context_harness.cost_tracker.
+    # Pricing table is in context_harness.cost_tracker. Hoist the variables so
+    # downstream save_turn + trace events don't rely on locals()-peeking.
+    tokens_in = 0
+    tokens_out = 0
     cost_usd = 0.0
     try:
         hist = dspy.settings.lm.history[-1]
-        tokens_in = hist.get("usage", {}).get("prompt_tokens", 0)
-        tokens_out = hist.get("usage", {}).get("completion_tokens", 0)
+        tokens_in = hist.get("usage", {}).get("prompt_tokens", 0) or 0
+        tokens_out = hist.get("usage", {}).get("completion_tokens", 0) or 0
         cost_usd = estimate_cost_usd(MODEL.split("/")[-1], tokens_in, tokens_out)
     except Exception:  # history isn't guaranteed present — fall back to zero
         pass
+
+    # Explicit trace event so the tracer captures tokens alongside latency
+    _record(turn_id, "tokens.measured", {
+        "tokens_in":  tokens_in,
+        "tokens_out": tokens_out,
+        "cost_usd":   cost_usd,
+    })
 
     citations = [
         Citation(doc_id=c.doc_id, text=c.text[:300], score=float(c.score or 0.0))
@@ -373,8 +383,8 @@ def ask(req: AskRequest) -> AskResponse:
                 agent_response=pred_dict,
                 mode=req.mode,
                 character=(req.character if req.mode == "perspective_shift" else None),
-                tokens_in=locals().get("tokens_in", 0) or 0,
-                tokens_out=locals().get("tokens_out", 0) or 0,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
                 cost_usd=cost_usd,
             )
             _record(turn_id, "chat_history.saved", {

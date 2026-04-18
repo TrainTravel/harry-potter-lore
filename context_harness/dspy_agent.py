@@ -259,6 +259,28 @@ def _normalize_character(name: str) -> str:
     return _CHARACTER_SLUG.get(key, key.replace(" ", "-"))
 
 
+import re as _re
+
+def _detect_character_in_question(question: str) -> Optional[str]:
+    """Scan a free-form question for any known character alias.
+
+    Returns the canonical slug of the first match (longest-alias-first
+    to avoid "Albus" winning over "Albus Dumbledore"), or ``None`` if
+    no character is mentioned.
+
+    Uses word-boundary matching so "Ron" doesn't match "Ronald"-style
+    substrings.
+    """
+    if not question:
+        return None
+    q_lower = question.lower()
+    # Match longer aliases first ("albus dumbledore" beats "albus")
+    for alias in sorted(_CHARACTER_SLUG.keys(), key=len, reverse=True):
+        if _re.search(rf"\b{_re.escape(alias)}\b", q_lower):
+            return _CHARACTER_SLUG[alias]
+    return None
+
+
 class PerspectiveShiftModule(dspy.Module):
     """
     Retrieves lore about a specific character, then applies their philosophy
@@ -319,17 +341,46 @@ class PerspectiveShiftModule(dspy.Module):
 class OpenAnalysisModule(dspy.Module):
     """
     Broad retrieval (k=7) + ChainOfThought over OpenAnalysisSignature.
-    Uses corpus as grounding but allows the LLM to reason beyond it.
+
+    Character-aware retrieval: when the question mentions a known
+    character AND a ``char_pipeline`` (character_lore collection) is
+    available, retrieval splits 5:2 between that character's chunks and
+    the general corpus. This addresses the observed grounding weakness
+    where analysis questions about a specific character ("why did Snape
+    become Snape") pulled from a generic 10-doc corpus with ~2-3 shallow
+    facts per chunk.
+
+    Falls back to pure default-corpus retrieval (k=7) when no character
+    is detected or no ``char_pipeline`` was wired in.
     """
 
-    def __init__(self, pipeline: RAGPipeline, k: int = 7) -> None:
+    def __init__(
+        self,
+        pipeline: RAGPipeline,
+        k: int = 7,
+        char_pipeline: Optional[RAGPipeline] = None,
+    ) -> None:
         super().__init__()
         self._pipeline = pipeline
+        self._char_pipeline = char_pipeline
         self._k = k
         self.predict = dspy.ChainOfThought(OpenAnalysisSignature)
 
     def forward(self, question: str, chat_history: str = "", **kwargs) -> dspy.Prediction:
-        chunks = self._pipeline.retrieve(question, top_k=self._k)
+        character_slug = _detect_character_in_question(question)
+
+        if character_slug and self._char_pipeline is not None:
+            # Split retrieval: most slots to character-specific chunks, a few
+            # for general-corpus context (institutions, events, themes that
+            # aren't character-scoped).
+            char_chunks = self._char_pipeline.retrieve(
+                question, top_k=5, where={"character": character_slug}
+            )
+            general_chunks = self._pipeline.retrieve(question, top_k=2)
+            chunks = list(char_chunks) + list(general_chunks)
+        else:
+            chunks = self._pipeline.retrieve(question, top_k=self._k)
+
         context = "\n\n".join(f"[{c.doc_id}] {c.text}" for c in chunks) or "No context retrieved."
         return self.predict(question=question, context=context, chat_history=chat_history)
 
@@ -470,7 +521,9 @@ class DSPyAgent:
             "deep_research":   DeepResearchModule(pipeline, k=research_k),
             "guided_learning": GuidedLearningModule(pipeline, k=learning_k),
             "exam_grader":     ExamGraderModule(pipeline, k=5),
-            "open_analysis":   OpenAnalysisModule(pipeline, k=7),
+            "open_analysis":   OpenAnalysisModule(
+                pipeline, k=7, char_pipeline=char_pipeline,
+            ),
             "perspective_shift": PerspectiveShiftModule(
                 pipeline, k=5, char_pipeline=char_pipeline,
             ),

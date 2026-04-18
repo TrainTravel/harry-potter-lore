@@ -290,6 +290,29 @@ class ConversationStore:
             "cost_usd":   float(row[3]),
         }
 
+    def turn_costs(self, conversation_id: str) -> list[dict[str, Any]]:
+        """Per-turn cost breakdown. Returns a list of
+        ``{turn_index, tokens_in, tokens_out, cost_usd, ts}`` dicts in
+        chronological order — useful for inspecting where cost went within
+        a single conversation and for spotting runaway context growth."""
+        rows = self._conn.execute(
+            """SELECT turn_index, tokens_in, tokens_out, cost_usd, ts
+               FROM conversations
+               WHERE conversation_id = ?
+               ORDER BY turn_index ASC""",
+            (conversation_id,),
+        ).fetchall()
+        return [
+            {
+                "turn_index": int(r[0]),
+                "tokens_in":  int(r[1] or 0),
+                "tokens_out": int(r[2] or 0),
+                "cost_usd":   float(r[3] or 0.0),
+                "ts":         float(r[4]),
+            }
+            for r in rows
+        ]
+
 
 # ---------------------------------------------------------------------------
 # Mode-specific agent-response formatters

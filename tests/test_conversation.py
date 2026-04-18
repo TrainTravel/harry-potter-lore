@@ -149,6 +149,26 @@ def test_conversation_cost_unknown_id_returns_zeros(store: ConversationStore):
     assert totals == {"turns": 0, "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0}
 
 
+def test_turn_costs_returns_per_turn_breakdown(store: ConversationStore):
+    store.save_turn("c1", "q1", {"explanation": "a"}, "guided_learning",
+                    tokens_in=100, tokens_out=50, cost_usd=0.01)
+    store.save_turn("c1", "q2", {"explanation": "b"}, "guided_learning",
+                    tokens_in=120, tokens_out=70, cost_usd=0.015)
+    store.save_turn("c1", "q3", {"explanation": "c"}, "guided_learning",
+                    tokens_in=140, tokens_out=90, cost_usd=0.020)
+
+    breakdown = store.turn_costs("c1")
+    assert len(breakdown) == 3
+    assert [b["turn_index"]  for b in breakdown] == [1, 2, 3]
+    assert [b["tokens_in"]   for b in breakdown] == [100, 120, 140]
+    assert [b["tokens_out"]  for b in breakdown] == [50, 70, 90]
+    assert [b["cost_usd"]    for b in breakdown] == [0.01, 0.015, 0.020]
+
+
+def test_turn_costs_empty_conversation_returns_empty_list(store: ConversationStore):
+    assert store.turn_costs("never-seen-id") == []
+
+
 # ---------------------------------------------------------------------------
 # Mode-specific formatter fallback
 # ---------------------------------------------------------------------------

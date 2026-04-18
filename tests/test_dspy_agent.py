@@ -43,6 +43,10 @@ def dummy_lm():
         "next_question": "What was the role of the Elder Wand?",
         "explanation": "The concept relates to the protection of love magic.",
         "reasoning": "Step by step reasoning.",
+        # OpenAnalysis output fields
+        "analysis": "Blended analysis drawing from canon and interpretation.",
+        "corpus_facts": "Key corpus facts.",
+        "own_reasoning": "Extended interpretation beyond the corpus.",
     }])
     dspy.configure(lm=lm)
     yield lm
@@ -207,6 +211,117 @@ def test_agent_raises_on_unknown_mode(pipeline):
     agent = DSPyAgent(pipeline)
     with pytest.raises(ValueError, match="Unknown mode"):
         agent.forward("hallucination_mode", "anything")
+
+
+# ---------------------------------------------------------------------------
+# Character detection — drives open_analysis character-aware retrieval
+# ---------------------------------------------------------------------------
+
+def test_detect_character_in_question_finds_common_aliases():
+    from context_harness.dspy_agent import _detect_character_in_question
+    assert _detect_character_in_question("why did Snape become Snape?") == "severus-snape"
+    assert _detect_character_in_question("what does Dumbledore think") == "albus-dumbledore"
+    assert _detect_character_in_question("how did Hermione change") == "hermione-granger"
+
+
+def test_detect_character_prefers_longer_alias():
+    """'Albus Dumbledore' should win over 'Albus' alone so we don't get
+    'albus-dumbledore' twice for the same phrase."""
+    from context_harness.dspy_agent import _detect_character_in_question
+    # Both aliases resolve to the same slug here; the key assertion is that
+    # no exception is raised and we get the expected slug.
+    assert _detect_character_in_question("tell me about Albus Dumbledore") == "albus-dumbledore"
+
+
+def test_detect_character_respects_word_boundary():
+    """'Ron' must not match 'Ronald' (different name) or substrings."""
+    from context_harness.dspy_agent import _detect_character_in_question
+    # 'Ronaldo the footballer' should not match our Ron slug
+    assert _detect_character_in_question("Ronaldo scored a goal") is None
+
+
+def test_detect_character_returns_none_for_no_character():
+    from context_harness.dspy_agent import _detect_character_in_question
+    assert _detect_character_in_question("what are the Deathly Hallows?") is None
+    assert _detect_character_in_question("") is None
+
+
+# ---------------------------------------------------------------------------
+# OpenAnalysisModule — character-aware retrieval split
+# ---------------------------------------------------------------------------
+
+def test_open_analysis_uses_char_pipeline_when_character_detected(pipeline, monkeypatch):
+    """When the question names a character AND char_pipeline is available,
+    retrieval should split: 5 chunks from char_pipeline (filtered by
+    character), 2 chunks from the default pipeline."""
+    from context_harness.dspy_agent import OpenAnalysisModule
+
+    # Track every .retrieve call on each pipeline
+    char_calls = []
+    orig_retrieve = pipeline.retrieve
+    def char_retrieve(query, top_k=None, where=None):
+        char_calls.append({"query": query, "top_k": top_k, "where": where})
+        return orig_retrieve(query, top_k=top_k)
+
+    general_calls = []
+    class _GeneralSpy:
+        def retrieve(self, query, top_k=None, where=None):
+            general_calls.append({"query": query, "top_k": top_k, "where": where})
+            return orig_retrieve(query, top_k=top_k)
+
+    # Use the real pipeline as char_pipeline (same embeddings) but wrap to spy
+    class _CharSpy:
+        def __init__(self, inner):
+            self._inner = inner
+        def retrieve(self, query, top_k=None, where=None):
+            char_calls.append({"query": query, "top_k": top_k, "where": where})
+            return self._inner.retrieve(query, top_k=top_k)
+
+    module = OpenAnalysisModule(
+        pipeline=_GeneralSpy(), k=7, char_pipeline=_CharSpy(pipeline),
+    )
+    module.forward(question="why did Snape become Snape?")
+
+    # One call each, with correct top_k split and the character filter
+    assert len(char_calls) == 1
+    assert char_calls[0]["top_k"] == 5
+    assert char_calls[0]["where"] == {"character": "severus-snape"}
+    assert len(general_calls) == 1
+    assert general_calls[0]["top_k"] == 2
+
+
+def test_open_analysis_falls_back_to_default_when_no_character(pipeline, monkeypatch):
+    """When no character is mentioned, open_analysis retrieves k=7 from
+    the default pipeline and never touches char_pipeline."""
+    from context_harness.dspy_agent import OpenAnalysisModule
+
+    char_calls = []
+    orig_retrieve = pipeline.retrieve
+
+    class _CharSpy:
+        def retrieve(self, query, top_k=None, where=None):
+            char_calls.append({"query": query, "top_k": top_k})
+            return orig_retrieve(query, top_k=top_k)
+
+    module = OpenAnalysisModule(
+        pipeline=pipeline, k=7, char_pipeline=_CharSpy(),
+    )
+    module.forward(question="what are the Deathly Hallows?")
+
+    # No calls to char_pipeline — no character detected
+    assert char_calls == []
+
+
+def test_open_analysis_without_char_pipeline_always_uses_default(pipeline):
+    """If no char_pipeline is wired in, open_analysis ignores character
+    detection and uses the default pipeline for everything. No crash."""
+    from context_harness.dspy_agent import OpenAnalysisModule
+
+    module = OpenAnalysisModule(pipeline=pipeline, k=7, char_pipeline=None)
+    result = module.forward(question="why did Snape become Snape?")
+    # Just asserting it returns without error — detection happens but
+    # falls back to default since char_pipeline is None.
+    assert hasattr(result, "analysis")
 
 
 def test_satirical_podcast_signature_input_fields():
