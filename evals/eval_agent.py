@@ -73,6 +73,32 @@ def judge(
     reference: str,
     kind: str,
 ) -> dict:
+    """Grade an agent answer. Kind-aware — distractors short-circuit the LLM.
+
+    For ``kind == "distractor"`` we skip the LLM call entirely and check
+    programmatically whether ``agent_answer`` contains a refusal phrase.
+    Why: the LLM judge was pulling in its own world knowledge and grading
+    distractors on content accuracy instead of refusal behaviour (see
+    PR #14 q20 case — agent correctly said "context doesn't contain this",
+    judge used HP canon to mark it wrong). Programmatic check is
+    deterministic, free, and drift-proof.
+    """
+    # Distractor short-circuit — no LLM cost, no LLM drift
+    if kind == "distractor":
+        # Lazy import to keep eval_agent.py independent of context_harness
+        # when someone vendors this file without the full project.
+        from context_harness.metrics import _is_refusal
+        refused = _is_refusal(agent_answer)
+        return {
+            "correct": refused,
+            "reason": (
+                "distractor: agent refused as expected"
+                if refused
+                else "distractor: agent answered but should have refused"
+            ),
+            "_judge_cost_usd": 0.0,
+        }
+
     prompt = (
         f"QUESTION: {question}\n"
         f"KIND: {kind}\n"
