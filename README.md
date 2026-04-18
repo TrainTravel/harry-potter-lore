@@ -80,14 +80,15 @@ python -m evals.eval_agent              # full run
                │  (compiled)  │  │   (per-call)  │  │  (per-turn)  │
                └──────┬───────┘  └──────────────┘  └──────────────┘
                       │
-           ┌──────────┼──────────┐
-           ▼                     ▼
-  ┌─────────────────┐   ┌─────────────────┐
-  │  Deep Research   │   │ Guided Learning  │
-  │  (k=10, CoT)    │   │ (k=3, Socratic)  │
-  └────────┬────────┘   └────────┬────────┘
-           │                     │
-           └──────────┬──────────┘
+           ┌──────────┼──────────┬──────────┐
+           ▼                     ▼          ▼
+  ┌─────────────────┐   ┌──────────────┐  ┌──────────────┐
+  │  Deep Research   │   │   Guided     │  │    Exam      │
+  │  (k=10, CoT)    │   │  Learning    │  │   Grader     │
+  │                  │   │ (k=3, Socr.) │  │  (k=5, strict│
+  └────────┬────────┘   └──────┬───────┘  └──────┬───────┘
+           │                   │                  │
+           └──────────┬────────┴──────────────────┘
                       ▼
            ┌─────────────────────┐
            │   RAG Pipeline      │
@@ -107,12 +108,17 @@ python -m evals.eval_agent              # full run
            └─────────────────────┘
 ```
 
-### Two agent modes
+### Three agent modes
 
 | Mode | Retrieval | Output | Metric |
 |---|---|---|---|
 | **Deep Research** | k=10 chunks, broad retrieval | answer + citations + confidence | citation overlap (>= 50% of expected docs) |
 | **Guided Learning** | k=3 chunks, narrow | hint + next_question + explanation | Socratic score (no spoilers, ends with ?) |
+| **Exam Grader** | k=5 chunks, strict | score (0-100) + is_passing + critique | score within ±15, passing agrees, critique >20 chars |
+
+### Planned: Creative Storytelling
+
+A fourth mode (`creative_storytelling`) is planned but not yet built. It would weave retrieved facts into a narrative (persona-driven: time-traveler, fantasy narrator) while the DSPy optimizer ensures 100% factual accuracy against the corpus. Harder to evaluate than the other modes — needs an LLM judge that can distinguish "creative and accurate" from "creative and hallucinated."
 
 ### Infrastructure layer
 
