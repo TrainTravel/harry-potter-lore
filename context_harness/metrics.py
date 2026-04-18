@@ -45,14 +45,21 @@ def deep_research_strict_metric(example, pred, trace=None) -> bool:
     return expected.issubset(actual) if expected else True
 
 
-# Refusal phrases — signals the agent declined to answer
+# Refusal phrases — signals the agent declined to answer. These are chosen
+# to minimise false positives on legitimate factual answers that happen to
+# share vocabulary (e.g. an answer saying the Elder Wand "was not available
+# to Harry before 1998" is NOT a refusal). Phrases are anchored to wording
+# that only appears when the agent is framing the RESPONSE ITSELF as
+# unavailable, not a canon event.
 _REFUSAL_PHRASES = (
-    "does not contain",
+    "context does not contain",
+    "text does not contain",
     "i don't know",
-    "not available",
+    "information is not available",
+    "answer is not available",
     "cannot answer",
-    "no information",
-    "not mentioned",
+    "no information about",
+    "not mentioned in the",
     "i'm sorry, but the provided",
     "the provided context does not",
 )

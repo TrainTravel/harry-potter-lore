@@ -24,7 +24,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import io
 import json
 import logging
 import math
@@ -196,7 +195,6 @@ def summarize(all_runs, label, warmup=True):
         kind_acc = sum(rates) / len(rates)
         print(f"    {k:11s}      {kind_acc:.0%} ({len(rates)} questions)")
 
-    hits = [v for v in per_q.values() if v["kind"] != "distractor"]
     print(f"  mean latency:     {mean_lat:.1f}s (warmup excluded)" if warmup else f"  mean latency:     {mean_lat:.1f}s")
     print(f"  total retries:    {total_retries}/{total_questions} ({total_retries/max(total_questions,1):.0%} of questions)")
 
@@ -248,21 +246,25 @@ def main():
     from google import genai
     judge_client = genai.Client()
 
-    # Set up retry counter on DSPy's logger
+    # Set up retry counter on DSPy's logger, scoped to this run so repeated
+    # invocations (e.g. compare_dspy.sh, test runners) don't stack handlers
+    # and double-count retries.
     retry_counter = RetryCounter()
     dspy_logger = logging.getLogger("dspy")
     dspy_logger.addHandler(retry_counter)
+    try:
+        all_runs = []
+        for run_idx in range(args.runs):
+            if args.runs > 1:
+                print(f"\n{'='*40}")
+                print(f"  RUN {run_idx + 1}/{args.runs}")
+                print(f"{'='*40}")
+            rows = run_once(agent, questions, judge_client, retry_counter, warmup=warmup)
+            all_runs.append(rows)
 
-    all_runs = []
-    for run_idx in range(args.runs):
-        if args.runs > 1:
-            print(f"\n{'='*40}")
-            print(f"  RUN {run_idx + 1}/{args.runs}")
-            print(f"{'='*40}")
-        rows = run_once(agent, questions, judge_client, retry_counter, warmup=warmup)
-        all_runs.append(rows)
-
-    result = summarize(all_runs, label, warmup=warmup)
+        result = summarize(all_runs, label, warmup=warmup)
+    finally:
+        dspy_logger.removeHandler(retry_counter)
 
     with open(out_path, "w") as f:
         json.dump(result, f, indent=2)

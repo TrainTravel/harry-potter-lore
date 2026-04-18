@@ -88,7 +88,7 @@ QUESTIONS: List[EvalQuestion] = [
     EvalQuestion(
         id="q9", kind="multi",
         question="What was Snape's real motivation for working against Voldemort?",
-        expected_docs={"severus-snape"},
+        expected_docs={"severus-snape", "lord-voldemort"},
         reference_answer="His lifelong love of Lily Evans (later Lily Potter). He defected to Dumbledore's side after Voldemort targeted her.",
     ),
     EvalQuestion(
