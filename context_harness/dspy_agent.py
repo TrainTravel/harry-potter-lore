@@ -74,11 +74,18 @@ class PerspectiveShiftSignature(dspy.Signature):
     character based on the retrieved lore, then apply it to a real-world situation
     the user describes. Ground the character's traits in corpus facts, then reason
     about how those traits translate to practical advice or insight. Be specific
-    and actionable — not generic motivational advice."""
+    and actionable — not generic motivational advice.
+
+    Multi-turn aware: ``chat_history`` carries prior turns in this session where
+    the user explored the same character's perspective on evolving facets of
+    the scenario. When present, treat the current scenario as a continuation —
+    build on the prior principle rather than reintroducing the character.
+    """
 
     scenario:  str = dspy.InputField(desc="the real-world situation or question")
     character: str = dspy.InputField(desc="the HP character whose perspective to apply")
     context:   str = dspy.InputField(desc="retrieved lore passages about this character, each prefixed [doc_id]")
+    chat_history: str = dspy.InputField(desc="prior perspective-shift turns in this conversation (may be empty). When present, the user is likely asking a follow-up on the same character's view — build on the earlier principle rather than restating it.")
 
     character_principle: str = dspy.OutputField(
         desc=("2-3 sentences. The core principle this character embodies, anchored "
@@ -279,7 +286,13 @@ class PerspectiveShiftModule(dspy.Module):
         self._k = k
         self.predict = dspy.ChainOfThought(PerspectiveShiftSignature)
 
-    def forward(self, scenario: str = "", character: str = "Dumbledore", **kwargs) -> dspy.Prediction:
+    def forward(
+        self,
+        scenario: str = "",
+        character: str = "Dumbledore",
+        chat_history: str = "",
+        **kwargs,
+    ) -> dspy.Prediction:
         slug = _normalize_character(character)
         chunks: list = []
 
@@ -295,7 +308,12 @@ class PerspectiveShiftModule(dspy.Module):
             chunks = self._pipeline.retrieve(query, top_k=self._k)
 
         context = "\n\n".join(f"[{c.doc_id}] {c.text}" for c in chunks) or "No context retrieved."
-        return self.predict(character=character, scenario=scenario, context=context)
+        return self.predict(
+            character=character,
+            scenario=scenario,
+            context=context,
+            chat_history=chat_history,
+        )
 
 
 class OpenAnalysisModule(dspy.Module):

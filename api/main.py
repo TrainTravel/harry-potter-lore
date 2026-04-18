@@ -72,7 +72,7 @@ from context_harness.security import PromptGuard, InputValidator, OutputFilter
 
 # Modes that participate in multi-turn conversation (Phase 0).
 # Others remain one-shot; client can send `conversation_id` but it's ignored.
-_CHAT_MODES = {"open_analysis", "guided_learning"}
+_CHAT_MODES = {"open_analysis", "guided_learning", "perspective_shift"}
 _conversation_store: ConversationStore | None = None
 
 
