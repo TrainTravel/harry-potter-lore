@@ -108,15 +108,21 @@ class OpenAnalysisSignature(dspy.Signature):
     your broader knowledge (psychology, literary theory, history, philosophy) to
     provide deep analysis. Clearly mark which parts come from the corpus vs your
     own reasoning. Do not refuse to answer — if the corpus is thin, lean on your
-    general knowledge and say so."""
+    general knowledge and say so.
+
+    Multi-turn aware: ``chat_history`` carries prior exchanges in this session.
+    When the user asks a follow-up like "so what did you mean earlier about X",
+    use the history to pick up the thread rather than restarting from scratch.
+    """
 
     question: str = dspy.InputField(desc="the analytical question")
     context:  str = dspy.InputField(desc="retrieved lore passages for grounding, each prefixed [doc_id]")
+    chat_history: str = dspy.InputField(desc="prior analysis turns in this conversation (may be empty for a new thread). When present, treat the current question as a continuation — reference or refine your earlier points rather than repeating them.")
 
-    analysis:       str = dspy.OutputField(desc="in-depth analysis blending corpus facts with broader knowledge")
-    corpus_facts:   str = dspy.OutputField(desc="key facts drawn from the retrieved context")
-    own_reasoning:  str = dspy.OutputField(desc="interpretations, theories, or analysis beyond the corpus")
-    citations:      str = dspy.OutputField(desc="space-separated doc_ids referenced, or 'none' if mostly general knowledge")
+    analysis:       str = dspy.OutputField(desc="3-5 sentences. Direct analysis blending corpus facts with broader knowledge. Commit to a position. Avoid hedging ('it's important to...') and avoid restating the question.")
+    corpus_facts:   str = dspy.OutputField(desc="2-3 sentences. ONLY facts drawn from [doc_id] chunks in context. Cite them.")
+    own_reasoning:  str = dspy.OutputField(desc="2-3 sentences. Claims NOT in the corpus — your broader knowledge, explicitly marked as interpretation.")
+    citations:      str = dspy.OutputField(desc="Space-separated doc_ids formatted as [doc-id], each in square brackets. Use ONLY doc_ids that appear in the context field. Output 'none' if the answer relies entirely on general knowledge.")
 
 
 class ExamGraderSignature(dspy.Signature):
@@ -135,15 +141,24 @@ class ExamGraderSignature(dspy.Signature):
 
 class GuidedLearningSignature(dspy.Signature):
     """Socratic tutor. Guide the learner without revealing the answer directly.
-    Use their past attempts to personalise the hint."""
+    Use their past attempts and the prior conversation to personalise the hint.
 
-    question:     str = dspy.InputField(desc="the learner's question")
-    context:      str = dspy.InputField(desc="relevant lore context for this concept")
-    past_attempts: str = dspy.InputField(desc="learner's prior answers/attempts, or 'none'")
+    Two memory fields:
+      - ``past_attempts``: the learner's own prior work on this problem,
+        client-supplied (they may edit / re-submit their attempt).
+      - ``chat_history``: the prior tutor-student exchanges in this session,
+        server-populated from the conversation store. Use it to avoid
+        repeating yourself and to pick up where you left off.
+    """
+
+    question:      str = dspy.InputField(desc="the learner's question")
+    context:       str = dspy.InputField(desc="retrieved lore passages, each prefixed [doc_id]")
+    past_attempts: str = dspy.InputField(desc="learner's prior answers/attempts on this specific problem, or 'none'")
+    chat_history:  str = dspy.InputField(desc="previous tutor-student exchanges in this session (may be empty for a new conversation)")
 
     hint:          str = dspy.OutputField(desc="a guiding hint that does not give the answer away")
-    next_question: str = dspy.OutputField(desc="a follow-up question to deepen understanding")
-    explanation:   str = dspy.OutputField(desc="concept explanation without revealing the direct answer")
+    next_question: str = dspy.OutputField(desc="a probing follow-up question ending with '?'")
+    explanation:   str = dspy.OutputField(desc="concept explanation (2-4 sentences) without revealing the direct answer")
 
 
 class DebateSignature(dspy.Signature):
@@ -295,10 +310,10 @@ class OpenAnalysisModule(dspy.Module):
         self._k = k
         self.predict = dspy.ChainOfThought(OpenAnalysisSignature)
 
-    def forward(self, question: str, **kwargs) -> dspy.Prediction:
+    def forward(self, question: str, chat_history: str = "", **kwargs) -> dspy.Prediction:
         chunks = self._pipeline.retrieve(question, top_k=self._k)
         context = "\n\n".join(f"[{c.doc_id}] {c.text}" for c in chunks) or "No context retrieved."
-        return self.predict(question=question, context=context)
+        return self.predict(question=question, context=context, chat_history=chat_history)
 
 
 class ExamGraderModule(dspy.Module):
@@ -338,12 +353,18 @@ class GuidedLearningModule(dspy.Module):
         question: str,
         concept: str = "",
         past_attempts: str = "none",
+        chat_history: str = "",
         user_profile: Optional[Dict[str, Any]] = None,
     ) -> dspy.Prediction:
         query = f"{concept} {question}".strip()
         chunks = self._pipeline.retrieve(query, top_k=self._k)
         context = "\n\n".join(f"[{c.doc_id}] {c.text}" for c in chunks) or "No context retrieved."
-        return self.predict(question=question, context=context, past_attempts=past_attempts)
+        return self.predict(
+            question=question,
+            context=context,
+            past_attempts=past_attempts,
+            chat_history=chat_history,
+        )
 
 
 class DebateModule(dspy.Module):
