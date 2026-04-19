@@ -64,6 +64,11 @@ def patched_lm(monkeypatch):
         "own_reasoning": "Test own reasoning.",
         "character_principle": "A principle grounded in specific canon events and decisions.",
         "applied_insight": "Applied insight that is specific and actionable within sixty to ninety words, giving the user a concrete stance.",
+        "arguments_for": "Canon-supported arguments in favour, referencing specific events.",
+        "arguments_against": "Canon-supported arguments against, referencing specific events.",
+        "verdict": "Verdict referencing the canon evidence weighed above.",
+        "transcript": "Host A: First line. Host B: Second line. Host A: Third line. Host B: Fourth line.",
+        "comedic_tension": "The absurdity of modern life colliding with magical institutions.",
     }
     lm = DummyLM(answers=[_answer_template] * 50)
     dspy.configure(lm=lm)
@@ -123,6 +128,73 @@ def test_deep_research_fires_expected_events(client):
     assert "llm.done" in names
     assert "tokens.measured" in names
     assert "turn.end" in names
+
+
+def test_debate_mode_is_wired_through_ask(client):
+    """debate mode must be accepted by /ask and produce the expected markdown
+    answer shape (For / Against / Verdict sections)."""
+    resp = client.post("/ask", json={
+        "question": "Is Snape a hero or a villain?",
+        "mode": "debate",
+    })
+    assert resp.status_code == 200
+    body = resp.json()
+    answer = body["answer"]
+    assert "**For:**" in answer
+    assert "**Against:**" in answer
+    assert "**Verdict:**" in answer
+
+    names = _all_event_names(body["turn_id"])
+    assert "turn.start" in names
+    assert "retrieve.done" in names
+    assert "llm.done" in names
+    assert "tokens.measured" in names
+    assert "turn.end" in names
+    # One-shot mode — no chat_history events even if a conversation_id is sent
+    assert "chat_history.loaded" not in names
+    assert "chat_history.saved" not in names
+
+
+def test_debate_ignores_conversation_id(client):
+    """debate is one-shot — conversation_id must be silently ignored."""
+    resp = client.post("/ask", json={
+        "question": "Was Dumbledore right to hide Harry's fate from him?",
+        "mode": "debate",
+        "conversation_id": "should-be-ignored-for-debate",
+    })
+    assert resp.status_code == 200
+    names = _all_event_names(resp.json()["turn_id"])
+    assert "chat_history.loaded" not in names
+    assert "chat_history.saved" not in names
+
+
+def test_satirical_podcast_mode_is_wired_through_ask(client):
+    """satirical_podcast accepts question + modern_angle; answer is a
+    transcript (with optional comedic_tension italicised at the end)."""
+    resp = client.post("/ask", json={
+        "question": "Quidditch commentary",
+        "mode": "satirical_podcast",
+        "modern_angle": "bored sports pundits",
+    })
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["answer"].strip() != ""
+
+    names = _all_event_names(body["turn_id"])
+    assert "turn.start" in names
+    assert "retrieve.done" in names
+    assert "llm.done" in names
+    assert "tokens.measured" in names
+    assert "turn.end" in names
+
+
+def test_satirical_podcast_default_modern_angle(client):
+    """modern_angle is optional and defaults to 'modern life'."""
+    resp = client.post("/ask", json={
+        "question": "The Ministry of Magic",
+        "mode": "satirical_podcast",
+    })
+    assert resp.status_code == 200
 
 
 def test_deep_research_does_not_fire_chat_history_events(client):
