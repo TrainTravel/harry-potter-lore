@@ -102,6 +102,18 @@ class PerspectiveShiftSignature(dspy.Signature):
         desc=("1-2 sentences. The bridge: why THIS character's specific experience "
               "maps to THIS scenario. Cite the connecting event, not a trait.")
     )
+    character_response: str = dspy.OutputField(
+        desc=("The character speaking DIRECTLY to the user, in first person, as "
+              "if they are in the same room. 120-180 words. Synthesize the "
+              "principle, insight, and reasoning above into the character's own "
+              "voice — do NOT label sections, do NOT say 'my principle is...' or "
+              "'applied to your situation...'. Weave canon events in naturally, "
+              "the way a mentor would reference a past experience. Use 'I' and "
+              "'you'. Match this character's known cadence and vocabulary "
+              "(Dumbledore: reflective, aphoristic; McGonagall: direct, dry; "
+              "Luna: oblique, unexpected). End with a single concrete question "
+              "or stance — not a summary.")
+    )
     citations: str = dspy.OutputField(
         desc=("Space-separated doc_ids formatted as [doc-id], each in square "
               "brackets. Use ONLY doc_ids that appear verbatim in the context "
