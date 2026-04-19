@@ -60,11 +60,16 @@ def _patched_completion(*args, **kwargs):
             else:
                 raise
 litellm.completion = _patched_completion
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from context_harness.conversation import ConversationStore
+from context_harness.conversation import (
+    ConversationStore,
+    GeminiSummarizer,
+    DEFAULT_COMPACTION_THRESHOLD,
+    DEFAULT_KEEP_RECENT,
+)
 from context_harness.cost_tracker import estimate_cost_usd
 from context_harness.dspy_agent import DSPyAgent
 from context_harness.ingest_lore import build_pipeline
@@ -72,7 +77,7 @@ from context_harness.security import PromptGuard, InputValidator, OutputFilter
 
 # Modes that participate in multi-turn conversation (Phase 0).
 # Others remain one-shot; client can send `conversation_id` but it's ignored.
-_CHAT_MODES = {"open_analysis", "guided_learning"}
+_CHAT_MODES = {"open_analysis", "guided_learning", "perspective_shift"}
 _conversation_store: ConversationStore | None = None
 
 
@@ -257,7 +262,7 @@ def ingest(req: IngestRequest) -> IngestResponse:
 
 
 @app.post("/ask", response_model=AskResponse)
-def ask(req: AskRequest) -> AskResponse:
+def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
     # --- Security: validate input at the boundary ---
     input_check = _input_validator.validate(req.question)
     if input_check.should_block:
@@ -294,12 +299,13 @@ def ask(req: AskRequest) -> AskResponse:
 
     # Multi-turn: for eligible modes, load prior turns and inject as text.
     # Ignored (silently) for one-shot modes — no need for the client to care.
+    # Compaction runs AFTER the response via BackgroundTasks so it never
+    # blocks the user-facing turn latency.
     conv_store: ConversationStore | None = None
     if req.conversation_id and req.mode in _CHAT_MODES:
         conv_store = _get_conversation_store()
-        history = conv_store.load_history(req.conversation_id, max_turns=5)
+        history = conv_store.load_history(req.conversation_id, max_turns=DEFAULT_KEEP_RECENT)
         kwargs["chat_history"] = conv_store.format_for_llm(history, mode=req.mode)
-        conv_store.compact_if_needed(req.conversation_id)   # Phase 0: warn-only
         _record(turn_id, "chat_history.loaded", {
             "conversation_id": req.conversation_id,
             "prior_turns": len(history.turns),
@@ -335,15 +341,25 @@ def ask(req: AskRequest) -> AskResponse:
         answer = f"**Hint:** {hint}\n\n**Why it matters:** {explain}"
 
     # Best-effort cost estimate — dspy exposes usage on the underlying LM history.
-    # Pricing table is in context_harness.cost_tracker.
+    # Pricing table is in context_harness.cost_tracker. Hoist the variables so
+    # downstream save_turn + trace events don't rely on locals()-peeking.
+    tokens_in = 0
+    tokens_out = 0
     cost_usd = 0.0
     try:
         hist = dspy.settings.lm.history[-1]
-        tokens_in = hist.get("usage", {}).get("prompt_tokens", 0)
-        tokens_out = hist.get("usage", {}).get("completion_tokens", 0)
+        tokens_in = hist.get("usage", {}).get("prompt_tokens", 0) or 0
+        tokens_out = hist.get("usage", {}).get("completion_tokens", 0) or 0
         cost_usd = estimate_cost_usd(MODEL.split("/")[-1], tokens_in, tokens_out)
     except Exception:  # history isn't guaranteed present — fall back to zero
         pass
+
+    # Explicit trace event so the tracer captures tokens alongside latency
+    _record(turn_id, "tokens.measured", {
+        "tokens_in":  tokens_in,
+        "tokens_out": tokens_out,
+        "cost_usd":   cost_usd,
+    })
 
     citations = [
         Citation(doc_id=c.doc_id, text=c.text[:300], score=float(c.score or 0.0))
@@ -373,14 +389,32 @@ def ask(req: AskRequest) -> AskResponse:
                 agent_response=pred_dict,
                 mode=req.mode,
                 character=(req.character if req.mode == "perspective_shift" else None),
-                tokens_in=locals().get("tokens_in", 0) or 0,
-                tokens_out=locals().get("tokens_out", 0) or 0,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
                 cost_usd=cost_usd,
             )
             _record(turn_id, "chat_history.saved", {
                 "conversation_id": req.conversation_id,
                 "turn_index": turn_idx,
             })
+            # Schedule compaction AFTER the response is returned. BackgroundTasks
+            # runs once the response has been shipped to the client, so the user
+            # sees zero latency impact. If compaction fails, the conversation
+            # simply keeps growing raw until the next successful attempt.
+            def _run_compaction(cid: str, tid: str):
+                try:
+                    did_compact = conv_store.compact_if_needed(
+                        cid, summarizer=GeminiSummarizer(),
+                        threshold=DEFAULT_COMPACTION_THRESHOLD,
+                        keep_recent=DEFAULT_KEEP_RECENT,
+                    )
+                    if did_compact:
+                        _record(tid, "compaction.done", {"conversation_id": cid})
+                except Exception as exc:
+                    _record(tid, "compaction.failed", {
+                        "conversation_id": cid, "error": str(exc),
+                    })
+            background.add_task(_run_compaction, req.conversation_id, turn_id)
         except Exception as exc:
             # Save failures should never block the response — log and move on.
             _record(turn_id, "chat_history.save_failed", {"error": str(exc)})
