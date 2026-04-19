@@ -117,7 +117,7 @@ def _record(turn_id: str, name: str, attrs: dict[str, Any] | None = None) -> Non
 
 class AskRequest(BaseModel):
     question: str
-    mode: str = Field(default="deep_research", pattern="^(deep_research|guided_learning|exam_grader|open_analysis|perspective_shift)$")
+    mode: str = Field(default="deep_research", pattern="^(deep_research|guided_learning|exam_grader|open_analysis|perspective_shift|debate|satirical_podcast)$")
     character: str = Field(default="Dumbledore", description="HP character for perspective_shift mode")
     collection_name: str = "hp_lore"
     provider: str = "gemini"
@@ -126,6 +126,7 @@ class AskRequest(BaseModel):
     # Other modes currently ignore it. Null / omitted = one-shot behaviour (old).
     conversation_id: str | None = Field(default=None, description="Optional conversation thread id; only guided_learning uses it in Phase 0")
     student_answer: str = Field(default="", description="Student's answer for exam_grader mode")
+    modern_angle: str = Field(default="modern life", description="Mundane contemporary lens for satirical_podcast mode")
 
 
 class IngestRequest(BaseModel):
@@ -278,7 +279,8 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
     _record(turn_id, "turn.start", {"question": req.question, "mode": req.mode})
 
     t_retrieve = time.perf_counter()
-    k = {"deep_research": 10, "open_analysis": 7, "perspective_shift": 5, "exam_grader": 5}.get(req.mode, 3)
+    k = {"deep_research": 10, "open_analysis": 7, "perspective_shift": 5,
+         "exam_grader": 5, "debate": 7, "satirical_podcast": 6}.get(req.mode, 3)
     chunks = pipeline.retrieve(req.question, top_k=k)
     _record(turn_id, "retrieve.done", {
         "n_chunks": len(chunks),
@@ -296,6 +298,8 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
         kwargs["student_answer"] = req.student_answer
     elif req.mode == "perspective_shift":
         kwargs["character"] = req.character
+    elif req.mode == "satirical_podcast":
+        kwargs["modern_angle"] = req.modern_angle
 
     # Multi-turn: for eligible modes, load prior turns and inject as text.
     # Ignored (silently) for one-shot modes — no need for the client to care.
@@ -335,6 +339,19 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
         is_passing = getattr(pred, "is_passing", False)
         critique = getattr(pred, "critique", "")
         answer = f"**Score:** {score}/100 ({'PASS' if is_passing else 'FAIL'})\n\n**Critique:** {critique}"
+    elif req.mode == "debate":
+        args_for = getattr(pred, "arguments_for", "")
+        args_against = getattr(pred, "arguments_against", "")
+        verdict = getattr(pred, "verdict", "")
+        answer = (
+            f"**For:** {args_for}\n\n"
+            f"**Against:** {args_against}\n\n"
+            f"**Verdict:** {verdict}"
+        )
+    elif req.mode == "satirical_podcast":
+        transcript = getattr(pred, "transcript", "")
+        tension = getattr(pred, "comedic_tension", "")
+        answer = f"{transcript}\n\n*{tension}*" if tension else transcript
     else:
         hint = getattr(pred, "hint", "")
         explain = getattr(pred, "explanation", "")
