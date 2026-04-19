@@ -64,6 +64,7 @@ def patched_lm(monkeypatch):
         "own_reasoning": "Test own reasoning.",
         "character_principle": "A principle grounded in specific canon events and decisions.",
         "applied_insight": "Applied insight that is specific and actionable within sixty to ninety words, giving the user a concrete stance.",
+        "character_response": "My dear, I once watched a young man stand where you stand now. The choice itself mattered less than the reason. Ask yourself which path you fear — and walk toward that one.",
         "arguments_for": "Canon-supported arguments in favour, referencing specific events.",
         "arguments_against": "Canon-supported arguments against, referencing specific events.",
         "verdict": "Verdict referencing the canon evidence weighed above.",
@@ -272,6 +273,24 @@ def test_multi_turn_open_analysis_sees_prior_turn(client, isolated_conv_store):
     assert len(loaded) == 1
     assert loaded[0]["attrs"]["prior_turns"] == 1
     assert loaded[0]["attrs"]["history_chars"] > 0
+
+
+def test_perspective_shift_returns_first_person_response_not_structured_labels(client):
+    """The answer should be the character's first-person response, NOT the
+    old three-part 'Principle / Applied / Why this maps' markdown."""
+    resp = client.post("/ask", json={
+        "question": "I'm stuck choosing between safety and risk.",
+        "mode": "perspective_shift",
+        "character": "Dumbledore",
+    })
+    assert resp.status_code == 200
+    answer = resp.json()["answer"]
+    # First-person synthesis present
+    assert answer.strip() != ""
+    # Old clinical labels must NOT appear
+    assert "**Dumbledore's Principle:**" not in answer
+    assert "**Applied to your situation:**" not in answer
+    assert "**Why this maps:**" not in answer
 
 
 def test_perspective_shift_is_now_a_chat_mode(client, isolated_conv_store):
