@@ -35,13 +35,22 @@ from context_harness.conversation import ConversationStore
 def patched_lm(monkeypatch):
     """Every test runs with DummyLM — no real API calls.
 
-    Configure DummyLM FIRST, then no-op any subsequent ``dspy.configure``
-    calls. FastAPI's lifespan re-configures dspy on TestClient startup
-    from a different thread; dspy 3.x forbids that, which crashes the
-    integration test. Silencing the second configure lets our DummyLM
-    win while the lifespan keeps doing everything else.
+    Three things we need to defuse for integration tests:
+
+      1. Configure DummyLM globally.
+      2. No-op subsequent ``dspy.configure`` calls — FastAPI's lifespan
+         re-configures on TestClient startup from a different thread; dspy
+         3.x forbids cross-thread reconfiguration.
+      3. No-op ``dspy.context`` — the /ask handler wraps each turn in
+         ``with dspy.context(lm=real_gemini_lm):`` which would override our
+         DummyLM and route to the actual API. Without this patch, CI fails
+         with "key=None" 400s and local runs silently burn API calls.
     """
-    lm = DummyLM(answers=[{
+    import contextlib
+
+    # One canned answer repeated N times so multi-turn tests (which issue
+    # 2-3 /ask calls) don't exhaust DummyLM's answer list.
+    _answer_template = {
         "answer": "Test answer.",
         "citations": "harry-potter",
         "confidence": "high",
@@ -55,9 +64,16 @@ def patched_lm(monkeypatch):
         "own_reasoning": "Test own reasoning.",
         "character_principle": "A principle grounded in specific canon events and decisions.",
         "applied_insight": "Applied insight that is specific and actionable within sixty to ninety words, giving the user a concrete stance.",
-    }])
+    }
+    lm = DummyLM(answers=[_answer_template] * 50)
     dspy.configure(lm=lm)
     monkeypatch.setattr(dspy, "configure", lambda **kw: None)
+
+    @contextlib.contextmanager
+    def _noop_context(**_kwargs):
+        # Keep the global DummyLM in effect; ignore per-request LM swaps.
+        yield
+    monkeypatch.setattr(dspy, "context", _noop_context)
     yield lm
 
 
