@@ -325,10 +325,14 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
     if req.mode == "deep_research":
         answer = getattr(pred, "answer", "")
     elif req.mode == "perspective_shift":
-        principle = getattr(pred, "character_principle", "")
-        insight = getattr(pred, "applied_insight", "")
-        reasoning = getattr(pred, "reasoning", "")
-        answer = f"**{req.character}'s Principle:** {principle}\n\n**Applied to your situation:** {insight}\n\n**Why this maps:** {reasoning}"
+        response = (getattr(pred, "character_response", "") or "").strip()
+        if response:
+            answer = response
+        else:
+            principle = getattr(pred, "character_principle", "")
+            insight = getattr(pred, "applied_insight", "")
+            reasoning = getattr(pred, "reasoning", "")
+            answer = f"**{req.character}'s Principle:** {principle}\n\n**Applied to your situation:** {insight}\n\n**Why this maps:** {reasoning}"
     elif req.mode == "open_analysis":
         analysis = getattr(pred, "analysis", "")
         corpus_facts = getattr(pred, "corpus_facts", "")
@@ -396,7 +400,9 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
         pred_dict = {
             k: getattr(pred, k, None)
             for k in ("answer", "analysis", "corpus_facts", "own_reasoning",
-                      "hint", "next_question", "explanation", "citations")
+                      "hint", "next_question", "explanation", "citations",
+                      "character_principle", "applied_insight", "reasoning",
+                      "character_response")
             if getattr(pred, k, None) is not None
         }
         try:
