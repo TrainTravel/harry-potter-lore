@@ -233,11 +233,28 @@ class RAGPipeline:
         top_k: int = 5,
         use_chromadb: bool = True,
         embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
+        reranker=None,
+        rerank_fetch_k: int = 20,
     ) -> None:
+        """
+        Args:
+            reranker: optional reranker (any object implementing
+                ``RerankerClient`` — has a ``rerank(query, candidates,
+                top_k)`` method). When set, ``retrieve()`` over-fetches
+                ``rerank_fetch_k`` candidates then calls the reranker to
+                select ``top_k``. When ``None``, retrieve returns raw
+                vector-search top-k.
+            rerank_fetch_k: number of candidates to pull from vector
+                search before reranking. Only used when ``reranker`` is
+                set. Default 20 is enough to give the reranker room to
+                surface chunks the embedder ranked lower.
+        """
         self.collection_name = collection_name
         self.strategy = chunking_strategy
         self.top_k = top_k
         self._chunks: List[Chunk] = []   # fallback in-memory store
+        self._reranker = reranker
+        self._rerank_fetch_k = rerank_fetch_k
 
         self._client = None
         self._collection = None
@@ -369,19 +386,29 @@ class RAGPipeline:
 
         Returns ``ScoredChunk``s rather than raw ``Chunk``s — the score is a
         per-query artifact and should not be attached to the stored value.
+
+        When a reranker is configured on this pipeline, retrieval is a
+        two-stage pipeline:
+          1. Vector search with ``n_results = rerank_fetch_k`` (typically
+             20) to give the reranker room to promote underranked chunks.
+          2. Reranker selects the top-k by its stronger relevance model.
+        If the reranker raises, retrieval falls back to the un-reranked
+        top-k rather than failing the request — availability > rerank.
         """
         k = top_k or self.top_k
+        # When reranking, over-fetch then cut down; when not, fetch exactly k.
+        fetch_k = self._rerank_fetch_k if self._reranker is not None else k
 
         if self._collection is not None:
             query_kwargs = {
                 "query_texts": [query],
-                "n_results":   min(k, self._collection.count() or 1),
+                "n_results":   min(fetch_k, self._collection.count() or 1),
                 "include":     ["documents", "metadatas", "distances"],
             }
             if where:
                 query_kwargs["where"] = where
             results = self._collection.query(**query_kwargs)
-            scored: List[ScoredChunk] = []
+            candidates: List[ScoredChunk] = []
             for doc, meta, dist, cid in zip(
                 results["documents"][0],
                 results["metadatas"][0],
@@ -389,11 +416,30 @@ class RAGPipeline:
                 results["ids"][0],
             ):
                 chunk = Chunk(text=doc, metadata=dict(meta), chunk_id=cid)
-                scored.append(ScoredChunk(chunk=chunk, score=1.0 - dist))
-            return scored
+                candidates.append(ScoredChunk(chunk=chunk, score=1.0 - dist))
+            return self._maybe_rerank(query, candidates, k)
 
         # fallback: simple keyword overlap scoring (no metadata filter support)
-        return self._keyword_retrieve(query, k)
+        candidates = self._keyword_retrieve(query, fetch_k)
+        return self._maybe_rerank(query, candidates, k)
+
+    def _maybe_rerank(
+        self,
+        query: str,
+        candidates: List[ScoredChunk],
+        top_k: int,
+    ) -> List[ScoredChunk]:
+        """Apply the configured reranker if one is set; gracefully fall back
+        to the un-reranked top_k on any failure so observability / 3rd-party
+        API outages don't block retrieval."""
+        if self._reranker is None:
+            return candidates[:top_k]
+        try:
+            return self._reranker.rerank(query, candidates, top_k)
+        except Exception as exc:
+            print(f"[RAGPipeline] Reranker failed ({type(exc).__name__}: {exc}); "
+                  f"falling back to un-reranked top_{top_k}.")
+            return candidates[:top_k]
 
     def _keyword_retrieve(self, query: str, k: int) -> List[ScoredChunk]:
         query_words = set(query.lower().split())
