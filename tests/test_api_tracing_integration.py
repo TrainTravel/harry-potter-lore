@@ -131,6 +131,40 @@ def test_deep_research_fires_expected_events(client):
     assert "turn.end" in names
 
 
+def test_deep_research_response_includes_gaps_field(client):
+    """Regression test for the missing-gaps bug. The DeepResearchSignature
+    declares a `gaps` output field ("aspects the context does not cover, or
+    'none'"), but `AskResponse` was not surfacing it — so the response body
+    had no way to communicate the LLM's self-declared knowledge boundaries.
+    After the fix, `gaps` must appear in the response (empty string for
+    modes whose Signature doesn't declare it)."""
+    resp = client.post("/ask", json={
+        "question": "Who killed Dumbledore?",
+        "mode": "deep_research",
+    })
+    assert resp.status_code == 200
+    body = resp.json()
+    # The field must exist on the response, regardless of whether the LLM
+    # populated it. DummyLM template sets gaps="none".
+    assert "gaps" in body
+    assert body["gaps"] == "none"
+
+
+def test_non_deep_research_modes_return_empty_gaps(client):
+    """Modes whose Signature doesn't declare a gaps field should return an
+    empty string (default), not a missing key."""
+    resp = client.post("/ask", json={
+        "question": "I'm stuck between safety and risk.",
+        "mode": "perspective_shift",
+        "character": "Dumbledore",
+    })
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "gaps" in body
+    # PerspectiveShiftSignature has no gaps field, so this hoists to ""
+    assert body["gaps"] == ""
+
+
 def test_debate_mode_is_wired_through_ask(client):
     """debate mode must be accepted by /ask and produce the expected markdown
     answer shape (For / Against / Verdict sections)."""
