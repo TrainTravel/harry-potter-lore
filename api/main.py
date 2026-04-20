@@ -60,6 +60,30 @@ def _patched_completion(*args, **kwargs):
             else:
                 raise
 litellm.completion = _patched_completion
+
+# Langfuse observability — Langfuse v4 @observe decorator pattern.
+# We deliberately do NOT use LiteLLM's "langfuse" callback string; LiteLLM's
+# bundled adapter was written against Langfuse v2/v3 (it reads
+# langfuse.version.__version__, which v4 renamed to langfuse._version) and
+# fails at init with a silent Non-Blocking Error on every call.
+#
+# Instead: the /ask handler is decorated with @observe, which creates a span
+# per request. We attach input/output/tokens/cost to the span explicitly via
+# langfuse.update_current_span(). No DSPy integration needed — we already
+# extract tokens from lm.history[-1] for our own cost tracking; we just also
+# push them to Langfuse.
+#
+# Langfuse v4 auto-initialises from env vars on first use. If LANGFUSE_PUBLIC_KEY
+# isn't set, the client is disabled and @observe / update_current_span become
+# no-ops. Local dev + CI without keys stay working; no gating code needed.
+_langfuse_enabled = bool(os.environ.get("LANGFUSE_PUBLIC_KEY"))
+if _langfuse_enabled:
+    print(f"[startup] Langfuse v4 observability enabled "
+          f"(host={os.environ.get('LANGFUSE_HOST', 'https://cloud.langfuse.com')})")
+else:
+    print("[startup] Langfuse keys not set — @observe decorators become no-ops")
+
+from langfuse import observe, get_client as _get_langfuse_client
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -269,6 +293,7 @@ def ingest(req: IngestRequest) -> IngestResponse:
 
 
 @app.post("/ask", response_model=AskResponse)
+@observe(name="ask")
 def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
     # --- Security: validate input at the boundary ---
     input_check = _input_validator.validate(req.question)
@@ -453,6 +478,34 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
             _record(turn_id, "chat_history.save_failed", {"error": str(exc)})
 
     _record(turn_id, "turn.end", {"cost_usd": cost_usd})
+
+    # Langfuse — attach input/output/usage to the current @observe span.
+    # When Langfuse isn't configured, get_client() returns a disabled client
+    # whose update_current_span is a no-op; the try/except guards against
+    # any unexpected SDK error so observability never breaks the response.
+    try:
+        _get_langfuse_client().update_current_span(
+            name=f"ask:{req.mode}",
+            input={
+                "question": req.question,
+                "mode": req.mode,
+                "character": req.character if req.mode == "perspective_shift" else None,
+                "conversation_id": req.conversation_id,
+            },
+            output={
+                "answer": answer,
+                "citations": [c.doc_id for c in citations],
+            },
+            metadata={
+                "tokens_in": tokens_in,
+                "tokens_out": tokens_out,
+                "cost_usd": cost_usd,
+                "latency_ms": llm_ms,
+                "turn_id": turn_id,
+            },
+        )
+    except Exception:
+        pass
 
     return AskResponse(
         turn_id=turn_id,
