@@ -153,6 +153,12 @@ class AskResponse(BaseModel):
     citations: list[Citation]
     cost_usd: float
     latency_ms: float
+    # Epistemic metadata — the LLM's self-declared sense of what it didn't
+    # cover. Populated for deep_research (from DeepResearchSignature.gaps).
+    # Empty string for other modes (until their Signatures add equivalent).
+    # Useful for gap analysis: aggregated across many turns, non-empty gaps
+    # indicate topics the corpus under-covers.
+    gaps: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -361,14 +367,18 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
         explain = getattr(pred, "explanation", "")
         answer = f"**Hint:** {hint}\n\n**Why it matters:** {explain}"
 
-    # Best-effort cost estimate — dspy exposes usage on the underlying LM history.
-    # Pricing table is in context_harness.cost_tracker. Hoist the variables so
-    # downstream save_turn + trace events don't rely on locals()-peeking.
+    # Token + cost tracking — read from the per-request `lm` we created above,
+    # NOT from `dspy.settings.lm`. The global settings.lm was configured in the
+    # lifespan handler and is NOT the LM that actually made this request's call
+    # (we wrapped it in `dspy.context(lm=lm)` on line 320). Reading from
+    # settings.lm.history silently returns stale or empty data in production —
+    # which is why Railway traces were reporting tokens_in=tokens_out=cost=0
+    # for every turn despite real LLM calls.
     tokens_in = 0
     tokens_out = 0
     cost_usd = 0.0
     try:
-        hist = dspy.settings.lm.history[-1]
+        hist = lm.history[-1]
         tokens_in = hist.get("usage", {}).get("prompt_tokens", 0) or 0
         tokens_out = hist.get("usage", {}).get("completion_tokens", 0) or 0
         cost_usd = estimate_cost_usd(MODEL.split("/")[-1], tokens_in, tokens_out)
@@ -450,6 +460,7 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
         citations=citations,
         cost_usd=cost_usd,
         latency_ms=llm_ms,
+        gaps=(getattr(pred, "gaps", "") or ""),
     )
 
 
