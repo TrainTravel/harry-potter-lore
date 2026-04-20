@@ -55,6 +55,7 @@ json-repair==0.59.3
 jupyter-client==8.6.3
 jupyter-core==5.8.1
 kubernetes==35.0.0
+langfuse==4.3.1
 litellm==1.83.7
 markdown-it-py==3.0.0
 matplotlib-inline==0.1.7

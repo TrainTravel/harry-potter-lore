@@ -60,6 +60,23 @@ def _patched_completion(*args, **kwargs):
             else:
                 raise
 litellm.completion = _patched_completion
+
+# Langfuse observability — register as a LiteLLM success/failure callback so
+# every DSPy→LiteLLM→provider call gets captured (full prompt, completion,
+# tokens, cost, latency) with zero per-call code. Only activates when both
+# LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are set; otherwise we skip the
+# registration silently so local dev + CI without keys still work. The
+# callback is non-blocking — events queue on a background thread and batch
+# POST to Langfuse, so /ask latency is unaffected. If Langfuse is down,
+# events are dropped rather than stalling the app.
+if os.environ.get("LANGFUSE_PUBLIC_KEY") and os.environ.get("LANGFUSE_SECRET_KEY"):
+    litellm.success_callback = ["langfuse"]
+    litellm.failure_callback = ["langfuse"]
+    print(f"[startup] Langfuse callback registered "
+          f"(host={os.environ.get('LANGFUSE_HOST', 'https://cloud.langfuse.com')})")
+else:
+    print("[startup] Langfuse keys not set — observability callback skipped")
+
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
