@@ -270,4 +270,149 @@ metadata filter:
 collection.query(query_texts=[q], n_results=k, where={"universe": "hp"})
 ```
 
+---
+
+## External Reranker (Cohere rerank-v3)
+
+### Motivation
+
+Cosine similarity between embeddings captures semantic nearness, but it's
+not trained for *answer relevance*. A dedicated reranker model — trained
+on (query, document, relevance-score) triples — typically lifts top-k
+hit rate by 10–20% over raw embedding similarity. The canonical example:
+Anthropic's Contextual Retrieval paper (Sep 2024) reported ~49%
+reduction in retrieval failures with a reranker in the pipeline.
+
+MMR (earlier in this doc) solves a *different* problem — redundancy
+across top-k. MMR and Cohere reranker are complementary, not
+alternatives. Both are "stage 2" operations over a stage-1 vector-search
+candidate set.
+
+### Pipeline shape
+
+```
+ User query
+     │
+     ▼
+ Vector search (fetch_k=20)  ←────── over-fetch, 4× the final top_k
+     │
+     │  20 candidates sorted by cosine
+     ▼
+ Cohere rerank-v3  ←──────────────── optional, env-gated on COHERE_API_KEY
+     │
+     │  5 candidates sorted by learned relevance
+     ▼
+ (optional: MMR reranking for diversity)
+     │
+     ▼
+ Top-k to LLM
+```
+
+### Design choices
+
+**1. Protocol + adapter pattern, not subclass.**
+`RerankerClient` is a `typing.Protocol` — any object with a `rerank(query,
+candidates, top_k)` method is a valid reranker. Three in-tree adapters:
+- `CohereReranker` — production
+- `IdentityReranker` — no-op; the A/B control arm
+- `FakeReranker` — test double that records every call
+
+Matches the same Protocol+adapter style already used for `Summarizer`
+in `context_harness/conversation.py` (with `GeminiSummarizer` +
+`FakeSummarizer` as the production / test adapters). Swap at composition
+time, no inheritance entanglement.
+
+**2. Over-fetch at the RAGPipeline layer, not inside the reranker.**
+`RAGPipeline.__init__` accepts `rerank_fetch_k=20` (default). `retrieve()`
+conditionally over-fetches when a reranker is attached:
+
+```python
+fetch_k = self._rerank_fetch_k if self._reranker is not None else k
+```
+
+Keeps the reranker abstraction simple — it just gets a list of candidates
+and returns a subset. The decision of *how many* candidates to hand it
+lives at the pipeline level where there's context on collection size +
+cost budget.
+
+**3. Env-gated construction via `build_reranker_from_env()`.**
+`ingest_lore.build_pipeline()` calls it; returns a `CohereReranker` if
+`COHERE_API_KEY` is set, otherwise `None`. No reranker = pipeline
+behaves identically to the pre-reranker version. CI and offline dev
+stay unaffected with zero config.
+
+**4. Graceful fallback on reranker failure.**
+`RAGPipeline._maybe_rerank()` wraps the reranker call in try/except. If
+the reranker raises (rate limit, network outage, bad auth, API-shape
+change), retrieval logs + falls back to the un-reranked top-k. Rationale:
+reranker is an *optimisation*, not a *correctness* requirement. Losing
+the reranker should degrade quality, not availability.
+
+**5. Reranker score replaces vector similarity score.**
+`ScoredChunk.score` after reranking is the reranker's `relevance_score`
+(0.0–1.0), not the original cosine-distance-derived score. Direct
+consumers (citation panel, traces, cost dashboards) see the stronger
+signal. Note: if you chain `retrieve() → mmr_rerank()`, MMR's internal
+relevance scoring ignores `ScoredChunk.score` and recomputes from
+embeddings, so the reranker's relevance doesn't propagate through MMR.
+For MMR + reranker composition to carry the reranker signal forward,
+MMR would need to be updated to use the incoming score rather than
+recomputing — follow-up work.
+
+### Configuration
+
+```bash
+# Enable — set these in .env (local) or Railway dashboard (prod)
+COHERE_API_KEY=co-key-...
+
+# Default fetch_k is 20; override via RAGPipeline(rerank_fetch_k=N)
+```
+
+### Where the code lives
+
+| Step | File | Symbol |
+|---|---|---|
+| `RerankerClient` Protocol | `context_harness/reranker.py` | `RerankerClient` |
+| Production adapter | `context_harness/reranker.py` | `CohereReranker` |
+| No-op baseline | `context_harness/reranker.py` | `IdentityReranker` |
+| Test double | `context_harness/reranker.py` | `FakeReranker` |
+| Env-gated factory | `context_harness/reranker.py` | `build_reranker_from_env()` |
+| Over-fetch + fallback logic | `context_harness/rag_pipeline.py` | `RAGPipeline._maybe_rerank()` |
+| Wiring into `build_pipeline` | `context_harness/ingest_lore.py` | `build_pipeline()` |
+
+### Evaluation — measuring the lift
+
+To A/B compare with vs without reranker:
+
+```bash
+# Control: no reranker
+COHERE_API_KEY= .venv/bin/python -m evals.eval_dspy --runs 3 > baseline.json
+
+# Treatment: Cohere rerank-v3
+.venv/bin/python -m evals.eval_dspy --runs 3 > reranked.json
+
+# Compare retrieval hit rate, answer correctness, latency, cost
+.venv/bin/python -m evals.compare_dspy baseline.json reranked.json
+```
+
+Expected deltas on the 20-question eval set:
+- **Retrieval hit rate:** +10–20 percentage points
+- **Answer correctness:** +5–10 percentage points (smaller lift because
+  retrieval was already decent on this small corpus)
+- **Latency:** +100–200 ms per call
+- **Cost:** ~$0.001 per call (free tier covers first 1k/month)
+
+### Trade-offs
+
+- **Pro:** biggest single-move quality win for RAG; drop-in.
+- **Pro:** composable — can run with MMR after, or instead of.
+- **Pro:** env-gated means free tier dev & full-power prod from one binary.
+- **Con:** adds a third-party dependency on the critical path (mitigated
+  by graceful fallback).
+- **Con:** `ScoredChunk.score` semantics change when reranker runs — the
+  number means something different. Cite in UI/logs carefully.
+- **Con:** DSPy-compiled few-shot demos selected with reranker-off may not
+  generalise cleanly to reranker-on (different candidate distribution).
+  Consider recompiling after enabling.
+
 or use one collection per universe and route the query before retrieval.

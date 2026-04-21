@@ -48,10 +48,18 @@ def parse_lore_file(path: Path) -> list[tuple[str, str]]:
 
 
 def build_pipeline(persist: bool = True, collection_name: str = "hp_lore") -> RAGPipeline:
-    """Build a RAGPipeline backed by a real ChromaDB store."""
+    """Build a RAGPipeline backed by a real ChromaDB store.
+
+    If ``COHERE_API_KEY`` is set in the environment, a ``CohereReranker``
+    is attached. Otherwise the pipeline returns raw vector-search top-k
+    (identical to pre-reranker behaviour). Silent env-gated upgrade so
+    CI + offline dev are unaffected when no key is configured.
+    """
     import chromadb
     from chromadb import Settings
     from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
+
+    from context_harness.reranker import build_reranker_from_env
 
     settings = Settings(anonymized_telemetry=False)
     client = (
@@ -61,6 +69,10 @@ def build_pipeline(persist: bool = True, collection_name: str = "hp_lore") -> RA
     )
     ef = DefaultEmbeddingFunction()
 
+    reranker = build_reranker_from_env()
+    if reranker is not None:
+        print(f"[ingest_lore] Reranker enabled: {type(reranker).__name__}")
+
     # Build with use_chromadb=False so __init__ doesn't try to connect;
     # we wire in our own persistent client directly.
     pipeline = RAGPipeline(
@@ -68,6 +80,7 @@ def build_pipeline(persist: bool = True, collection_name: str = "hp_lore") -> RA
         chunking_strategy=ChunkingStrategy.PARAGRAPH,
         top_k=5,
         use_chromadb=False,
+        reranker=reranker,
     )
     pipeline._client = client
     pipeline._ef = ef
