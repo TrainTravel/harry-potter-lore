@@ -303,6 +303,33 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
     if injection_check.should_block:
         raise HTTPException(400, f"Input rejected: {injection_check.reason}")
 
+    # --- Minimal-input validation ---
+    # Empty / whitespace-only / ultra-short inputs (< 3 chars) produce
+    # mechanical "I need a question"-style placeholder responses from the
+    # LLM, complete with field labels leaking into the rendered output
+    # ("From the corpus: none. My analysis: I need a question"). Catch
+    # these at the boundary rather than letting the Signature handle
+    # them. Single-word stopwords get the same treatment unless a
+    # conversation_id is present — in a multi-turn context, "nothing" or
+    # "hmm" can be a meaningful answer to a prior follow-up question and
+    # chat_history will help the LLM interpret it.
+    _stripped = req.question.strip()
+    _SINGLE_WORD_STOPWORDS = {"nothing", "hmm", "ok", "okay", "idk", "nah",
+                              "yeah", "sure", "no", "yes"}
+    if len(_stripped) < 3:
+        raise HTTPException(
+            400,
+            "Please share a bit more — even one sentence helps the agent "
+            "understand what you're looking for.",
+        )
+    if (_stripped.lower() in _SINGLE_WORD_STOPWORDS
+            and not req.conversation_id):
+        raise HTTPException(
+            400,
+            f'"{_stripped}" is too terse to answer from a cold start. Try '
+            f"phrasing as a question or full thought.",
+        )
+
     agent = get_agent(req.collection_name)
     pipeline = _pipelines_cache[req.collection_name]
 

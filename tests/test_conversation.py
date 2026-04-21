@@ -128,6 +128,80 @@ def test_format_for_llm_chronological_order(store: ConversationStore):
 
 
 # ---------------------------------------------------------------------------
+# Cross-mode history — each turn should format under its own saved mode
+# (regression: pre-2026-04-21, turns from a different mode rendered as
+# empty strings because format_for_llm passed the current mode to every
+# turn's formatter, so perspective_shift turns vanished when the next
+# query was open_analysis).
+# ---------------------------------------------------------------------------
+
+def test_format_for_llm_cross_mode_history_preserves_earlier_turn(
+    store: ConversationStore,
+):
+    """A conversation that spans two modes — perspective_shift turn-1,
+    then open_analysis turn-2 — must still surface the perspective_shift
+    turn's content in the formatted history. Earlier behaviour would
+    lose it entirely."""
+    store.save_turn(
+        conversation_id="c-cross",
+        user_message="I have imposter syndrome at work.",
+        agent_response={
+            "character_principle": "Luna: trust your own observations.",
+            "applied_insight": "The Wrackspurts of self-doubt...",
+            "reasoning": "Luna's defining trait is internal certainty.",
+            "character_response": "Oh, imposter syndrome? It sounds a bit "
+                                  "like a Nargle whispering doubts.",
+        },
+        mode="perspective_shift",
+        character="luna-lovegood",
+    )
+    store.save_turn(
+        conversation_id="c-cross",
+        user_message="Can you analyse this from a psychological angle?",
+        agent_response={
+            "analysis": "Imposter syndrome is a cognitive pattern where...",
+            "corpus_facts": "none",
+            "own_reasoning": "Drawing on Clance & Imes 1978.",
+        },
+        mode="open_analysis",
+    )
+
+    history = store.load_history("c-cross")
+    # Format for an open_analysis follow-up — turn-1 should STILL appear
+    formatted = store.format_for_llm(history, mode="open_analysis")
+
+    # The earlier perspective_shift turn's character_response must be
+    # surfaced (via the per-turn mode + fallback path), not silently dropped.
+    assert "Nargle" in formatted, (
+        f"Cross-mode turn-1 content should appear in open_analysis history, "
+        f"but got:\n{formatted}"
+    )
+    # The turn-2 analysis content must also appear.
+    assert "cognitive pattern" in formatted
+
+
+def test_format_for_llm_falls_through_to_durable_field_when_mode_field_empty(
+    store: ConversationStore,
+):
+    """Even if a turn is saved under mode X but the response dict only has
+    mode-Y fields (mismatched save/mode — shouldn't normally happen, but
+    defensive), the fallback should surface SOMETHING durable."""
+    store.save_turn(
+        conversation_id="c-mismatch",
+        user_message="Some query",
+        # Saved under guided_learning, but response only has perspective_shift
+        # fields. Legitimate migration / test-fixture shape.
+        agent_response={
+            "character_response": "A meaningful first-person reply.",
+        },
+        mode="guided_learning",
+    )
+    history = store.load_history("c-mismatch")
+    formatted = store.format_for_llm(history, mode="guided_learning")
+    assert "meaningful first-person reply" in formatted
+
+
+# ---------------------------------------------------------------------------
 # conversation_cost
 # ---------------------------------------------------------------------------
 

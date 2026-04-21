@@ -336,7 +336,14 @@ class ConversationStore:
 
         for t in history.turns:
             parts.append(f"[{t.turn_index}] User: {t.user_message}")
-            agent_text = _format_agent_response(t.agent_response, mode)
+            # Format each turn under the mode it was SAVED under, not the
+            # current query's mode. This makes cross-mode conversations
+            # coherent: a perspective_shift turn shows Luna's voice, a
+            # subsequent open_analysis turn shows the analytical content,
+            # etc. Falls back to `mode` for turns without a saved mode
+            # (legacy data or test fixtures).
+            turn_mode = t.mode or mode
+            agent_text = _format_agent_response(t.agent_response, turn_mode)
             if agent_text:
                 parts.append(f"     Tutor: {agent_text}")
 
@@ -517,20 +524,64 @@ class ConversationStore:
 # Mode-specific agent-response formatters
 # ---------------------------------------------------------------------------
 
-def _format_agent_response(response: dict[str, Any], mode: str) -> str:
-    """Pick the durable field(s) from a mode's structured output.
+# Ordered durable-content fields, tried when the mode-specific extraction
+# produces nothing useful. This catch-all is what makes cross-mode history
+# work — if turn-1 was perspective_shift (character_response field) and
+# turn-2's mode is open_analysis (looks for analysis field), turn-1 still
+# contributes coherent content to the formatted history instead of
+# disappearing entirely.
+_DURABLE_FIELD_FALLBACK = (
+    "character_response",  # perspective_shift synthesis (first-person voice)
+    "analysis",            # open_analysis main field
+    "answer",              # deep_research main field
+    "explanation",         # guided_learning durable field
+)
 
-    Surfaces only what the next turn will find useful. Hints and
-    next_questions are turn-ephemera — a student asking a follow-up
-    doesn't need to see the hint they got two turns ago; they need the
-    conceptual explanation the tutor gave."""
+
+def _format_agent_response(response: dict[str, Any], mode: str) -> str:
+    """Pick the durable field(s) from a structured response, mode-aware with
+    a cross-mode fallback.
+
+    Design: each mode has its own "durable" field(s) — the content a future
+    turn should see. For the current turn's own mode, we extract those
+    fields. But prior turns in the conversation might have been in a
+    different mode (before 2026-04-21, the frontend silently allowed mode
+    switches mid-conversation — a bug being fixed separately but we still
+    need to handle the existing data). So: after mode-specific extraction,
+    if the result is empty, fall through to a priority list of durable
+    fields that exist across modes.
+
+    Without the fallback, a perspective_shift turn's content would vanish
+    entirely when the next turn asks for open_analysis formatting —
+    `response.get("analysis", "")` returns "" for a pshift response.
+    """
+    # Mode-specific extraction (preferred path)
+    result = ""
     if mode == "guided_learning":
-        return str(response.get("explanation", "")).strip()
-    if mode == "open_analysis":
-        return str(response.get("analysis", "")).strip()
-    if mode == "perspective_shift":
-        principle = str(response.get("character_principle", "")).strip()
-        insight = str(response.get("applied_insight", "")).strip()
-        return f"{principle} / {insight}" if principle or insight else ""
-    # Unknown mode — dump a compact rendering so we don't silently lose context
+        result = str(response.get("explanation", "")).strip()
+    elif mode == "open_analysis":
+        result = str(response.get("analysis", "")).strip()
+    elif mode == "perspective_shift":
+        # Prefer the synthesis field (first-person character voice) — matches
+        # the synthesis pattern in PerspectiveShiftSignature.
+        char_response = str(response.get("character_response", "")).strip()
+        if char_response:
+            result = char_response
+        else:
+            principle = str(response.get("character_principle", "")).strip()
+            insight = str(response.get("applied_insight", "")).strip()
+            result = f"{principle} / {insight}" if principle or insight else ""
+
+    if result:
+        return result
+
+    # Cross-mode fallback — the response was saved under a different mode
+    # than the one we're formatting for. Surface any durable field we
+    # recognise, in priority order.
+    for key in _DURABLE_FIELD_FALLBACK:
+        val = str(response.get(key, "")).strip()
+        if val:
+            return val
+
+    # Last-resort fallback: compact JSON dump so context isn't silently lost
     return json.dumps(response, default=str)[:400]

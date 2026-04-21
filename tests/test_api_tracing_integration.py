@@ -115,6 +115,67 @@ def _all_event_names(turn_id: str) -> list[str]:
 # One-shot modes — no multi-turn events
 # ---------------------------------------------------------------------------
 
+def test_empty_input_rejected(client):
+    """Whitespace-only / empty inputs are caught by the input validator at
+    the security layer. Any 4xx is acceptable — the point is they don't
+    reach the LLM to produce mechanical placeholder responses."""
+    resp = client.post("/ask", json={
+        "question": "",
+        "mode": "open_analysis",
+    })
+    assert resp.status_code == 400
+
+
+def test_ultra_short_input_rejected_with_helpful_message(client):
+    """Inputs in the 2-char gap (e.g. "hi", "ok") bypass the security
+    validator's min=1 check but are caught by our new minimal-input
+    validation, which returns a friendlier 'share a bit more' message.
+    Regression for 2026-04-21 bug where "nothing" as turn-2 input
+    returned a templated 'From the corpus: none. My analysis: ...'."""
+    resp = client.post("/ask", json={
+        "question": "hi",  # exactly 2 non-whitespace chars
+        "mode": "deep_research",
+    })
+    assert resp.status_code == 400
+    detail = resp.json()["detail"].lower()
+    assert "share a bit more" in detail or "too short" in detail
+
+
+def test_single_stopword_rejected_without_conversation_id(client):
+    """Known stopwords-only input ('nothing', 'hmm', 'idk'...) without a
+    conversation_id = cold start. No context to interpret them in.
+    Reject at boundary."""
+    resp = client.post("/ask", json={
+        "question": "nothing",
+        "mode": "open_analysis",
+    })
+    assert resp.status_code == 400
+    assert "too terse" in resp.json()["detail"].lower()
+
+
+def test_single_stopword_accepted_with_conversation_id(client, isolated_conv_store):
+    """In a multi-turn context, 'nothing' can be a meaningful answer to a
+    prior follow-up question. Let chat_history help the LLM interpret it.
+    Accept at the boundary."""
+    # Seed a prior turn so chat_history is non-empty
+    r1 = client.post("/ask", json={
+        "question": "I'm dealing with imposter syndrome.",
+        "mode": "perspective_shift",
+        "character": "Luna",
+        "conversation_id": "c-terse",
+    })
+    assert r1.status_code == 200
+
+    # Follow-up with a terse answer — should be accepted
+    r2 = client.post("/ask", json={
+        "question": "nothing",
+        "mode": "perspective_shift",
+        "character": "Luna",
+        "conversation_id": "c-terse",
+    })
+    assert r2.status_code == 200
+
+
 def test_deep_research_fires_expected_events(client):
     resp = client.post("/ask", json={
         "question": "Who killed Dumbledore?",
@@ -396,7 +457,7 @@ def test_turn_indices_monotonic_per_conversation(client, isolated_conv_store):
     ids = []
     for i in range(3):
         r = client.post("/ask", json={
-            "question": f"q{i}",
+            "question": f"question {i} is long enough",
             "mode": "open_analysis",
             "conversation_id": "c-mono-1",
         })
@@ -409,15 +470,15 @@ def test_turn_indices_monotonic_per_conversation(client, isolated_conv_store):
 
 def test_separate_conversations_have_independent_indices(client, isolated_conv_store):
     ra = client.post("/ask", json={
-        "question": "q1-a", "mode": "open_analysis",
+        "question": "first question for conv A", "mode": "open_analysis",
         "conversation_id": "c-A",
     })
     rb = client.post("/ask", json={
-        "question": "q1-b", "mode": "open_analysis",
+        "question": "first question for conv B", "mode": "open_analysis",
         "conversation_id": "c-B",
     })
     ra2 = client.post("/ask", json={
-        "question": "q2-a", "mode": "open_analysis",
+        "question": "second question for conv A", "mode": "open_analysis",
         "conversation_id": "c-A",
     })
     t_a1 = _events_of_kind(ra.json()["turn_id"], "chat_history.saved")[0]["attrs"]["turn_index"]
