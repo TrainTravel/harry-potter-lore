@@ -28,11 +28,24 @@ un-reranked top-k so availability isn't blocked on observability.
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from typing import List, Optional, Protocol, runtime_checkable
 
 from context_harness.rag_pipeline import ScoredChunk
+
+_log = logging.getLogger(__name__)
+
+# Default Cohere model. The bare "rerank-v3.0" string used in an earlier
+# iteration is NOT a valid Cohere model identifier — Cohere publishes
+# "rerank-english-v3.0", "rerank-multilingual-v3.0", and "rerank-v3.5".
+# Override via env: COHERE_RERANK_MODEL="rerank-v3.5".
+_DEFAULT_COHERE_MODEL = os.environ.get("COHERE_RERANK_MODEL", "rerank-english-v3.0")
+
+# Timeout (seconds) applied to the Cohere rerank network call. Bounded so a
+# hanging API doesn't stall /ask latency. Override via env.
+_DEFAULT_COHERE_TIMEOUT_S = float(os.environ.get("COHERE_RERANK_TIMEOUT_S", "10.0"))
 
 
 @runtime_checkable
@@ -132,7 +145,8 @@ class CohereReranker:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "rerank-v3.0",
+        model: Optional[str] = None,
+        timeout_s: Optional[float] = None,
     ) -> None:
         key = api_key or os.environ.get("COHERE_API_KEY")
         if not key:
@@ -148,7 +162,8 @@ class CohereReranker:
                 "Install with: uv pip install cohere",
             ) from exc
         self._client = cohere.Client(api_key=key)
-        self._model = model
+        self._model = model or _DEFAULT_COHERE_MODEL
+        self._timeout_s = timeout_s if timeout_s is not None else _DEFAULT_COHERE_TIMEOUT_S
 
     def rerank(
         self,
@@ -161,22 +176,40 @@ class CohereReranker:
         if top_k <= 0:
             return []
 
+        import cohere  # for RequestOptions
+
         docs = [c.text for c in candidates]
         response = self._client.rerank(
             model=self._model,
             query=query,
             documents=docs,
             top_n=min(top_k, len(docs)),
+            request_options=cohere.core.RequestOptions(timeout_in_seconds=self._timeout_s),
         )
         # response.results = list of {index, relevance_score}
         reranked: List[ScoredChunk] = []
+        seen_indices: set[int] = set()
         for r in response.results:
+            # Defensive bounds check — a buggy API response with index
+            # outside [0, len(docs)) shouldn't IndexError the caller.
+            if r.index < 0 or r.index >= len(candidates):
+                _log.warning(
+                    "CohereReranker: response index %d out of range [0, %d); skipping",
+                    r.index, len(candidates),
+                )
+                continue
+            # Defensive dedup — shouldn't happen but would produce duplicate
+            # chunks in the output if it did.
+            if r.index in seen_indices:
+                continue
+            seen_indices.add(r.index)
             original = candidates[r.index]
             # Replace the vector-similarity score with the reranker's
-            # relevance score (0.0-1.0) so downstream consumers see the
-            # stronger signal.
+            # relevance score (0.0-1.0). Note: downstream MMR recomputes
+            # its own scores, so this is only load-bearing for direct
+            # consumers (citations panel, traces, cost dashboards).
             reranked.append(ScoredChunk(chunk=original.chunk, score=r.relevance_score))
-        return reranked
+        return reranked[:top_k]
 
 
 # ---------------------------------------------------------------------------
@@ -198,7 +231,9 @@ def build_reranker_from_env() -> Optional[RerankerClient]:
         try:
             return CohereReranker()
         except Exception as exc:
-            print(f"[reranker] CohereReranker init failed ({exc}); "
-                  f"proceeding without reranker.")
+            _log.warning(
+                "CohereReranker init failed (%s); proceeding without reranker.",
+                exc,
+            )
             return None
     return None

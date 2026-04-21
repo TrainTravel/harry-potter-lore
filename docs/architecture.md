@@ -317,9 +317,10 @@ candidates, top_k)` method is a valid reranker. Three in-tree adapters:
 - `IdentityReranker` — no-op; the A/B control arm
 - `FakeReranker` — test double that records every call
 
-Matches the same Protocol+adapter style already used for `Summarizer`,
-`LLMJudgeClient`, etc. Swap at composition time, no inheritance
-entanglement.
+Matches the same Protocol+adapter style already used for `Summarizer`
+in `context_harness/conversation.py` (with `GeminiSummarizer` +
+`FakeSummarizer` as the production / test adapters). Swap at composition
+time, no inheritance entanglement.
 
 **2. Over-fetch at the RAGPipeline layer, not inside the reranker.**
 `RAGPipeline.__init__` accepts `rerank_fetch_k=20` (default). `retrieve()`
@@ -349,10 +350,14 @@ the reranker should degrade quality, not availability.
 
 **5. Reranker score replaces vector similarity score.**
 `ScoredChunk.score` after reranking is the reranker's `relevance_score`
-(0.0–1.0), not the original cosine-distance-derived score. Downstream
-consumers (MMR, citation display, traces) see the stronger signal. The
-original ranking is preserved in the list order; the score is
-overwritten.
+(0.0–1.0), not the original cosine-distance-derived score. Direct
+consumers (citation panel, traces, cost dashboards) see the stronger
+signal. Note: if you chain `retrieve() → mmr_rerank()`, MMR's internal
+relevance scoring ignores `ScoredChunk.score` and recomputes from
+embeddings, so the reranker's relevance doesn't propagate through MMR.
+For MMR + reranker composition to carry the reranker signal forward,
+MMR would need to be updated to use the incoming score rather than
+recomputing — follow-up work.
 
 ### Configuration
 

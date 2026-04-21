@@ -131,10 +131,26 @@ def test_cohere_reranker_raises_without_key(monkeypatch):
 
 def test_cohere_reranker_accepts_explicit_key(monkeypatch):
     monkeypatch.delenv("COHERE_API_KEY", raising=False)
+    monkeypatch.delenv("COHERE_RERANK_MODEL", raising=False)
     # Construction should succeed even if the key is bogus — we don't make
     # an API call at init time.
     reranker = CohereReranker(api_key="fake-key-abc")
-    assert reranker._model == "rerank-v3.0"
+    # Default model is a real Cohere model name (bare "rerank-v3.0" is NOT
+    # a valid Cohere model and was fixed in response to code review).
+    assert reranker._model == "rerank-english-v3.0"
+    assert reranker._timeout_s == 10.0
+
+
+def test_cohere_reranker_accepts_explicit_model_param():
+    """Explicit model param overrides the module-level default."""
+    r = CohereReranker(api_key="fake-key", model="rerank-v3.5")
+    assert r._model == "rerank-v3.5"
+
+
+def test_cohere_reranker_accepts_explicit_timeout():
+    """Explicit timeout_s param overrides the module-level default."""
+    r = CohereReranker(api_key="fake-key", timeout_s=2.5)
+    assert r._timeout_s == 2.5
 
 
 # ---------------------------------------------------------------------------
@@ -207,6 +223,30 @@ def test_pipeline_reranker_failure_falls_back_to_raw_topk():
     # Should NOT raise — should fall back gracefully
     result = pipeline.retrieve("text", top_k=3)
     assert len(result) == 3
+
+
+def test_pipeline_reranker_failure_logs_warning(caplog):
+    """Silent degradation is a production hazard — assert the fallback
+    path logs at WARNING level so operators can see it in Railway logs
+    and Langfuse spans. Regression test for review feedback on PR #24."""
+    import logging
+    pipeline = _pipeline_without_chromadb()
+    for i in range(3):
+        pipeline._chunks.append(Chunk(text=f"text {i}", metadata={"doc_id": f"d{i}"}))
+
+    class BrokenReranker:
+        def rerank(self, query, candidates, top_k):
+            raise ConnectionError("simulated Cohere API outage")
+
+    pipeline._reranker = BrokenReranker()
+    with caplog.at_level(logging.WARNING, logger="context_harness.rag_pipeline"):
+        result = pipeline.retrieve("text", top_k=2)
+
+    assert len(result) == 2
+    # Must log a warning so prod operators see silent fallback
+    warning_messages = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("Reranker failed" in m for m in warning_messages), \
+        f"Expected a 'Reranker failed' warning; got: {warning_messages}"
 
 
 def test_pipeline_reranker_changes_ordering():

@@ -14,11 +14,14 @@ Context Engineering principles applied here:
 
 from __future__ import annotations
 
+import logging
 import re
 import uuid
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, TypedDict
+
+_log = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -431,14 +434,21 @@ class RAGPipeline:
     ) -> List[ScoredChunk]:
         """Apply the configured reranker if one is set; gracefully fall back
         to the un-reranked top_k on any failure so observability / 3rd-party
-        API outages don't block retrieval."""
+        API outages don't block retrieval.
+
+        Logs at WARNING level via the module logger so silent-degradation
+        in prod is visible to operators watching logs / Langfuse spans.
+        """
         if self._reranker is None:
             return candidates[:top_k]
         try:
             return self._reranker.rerank(query, candidates, top_k)
         except Exception as exc:
-            print(f"[RAGPipeline] Reranker failed ({type(exc).__name__}: {exc}); "
-                  f"falling back to un-reranked top_{top_k}.")
+            _log.warning(
+                "Reranker failed (%s: %s); falling back to un-reranked top_%d.",
+                type(exc).__name__, exc, top_k,
+                exc_info=True,
+            )
             return candidates[:top_k]
 
     def _keyword_retrieve(self, query: str, k: int) -> List[ScoredChunk]:
