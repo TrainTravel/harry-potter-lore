@@ -211,17 +211,47 @@ def socratic_score(example, pred, trace=None) -> float:
 # Perspective Shift — character principle applied to real world
 # ---------------------------------------------------------------------------
 
+# Greeting phrases that indicate cold-start voice on a turn-2+ reply.
+# Regression target (2026-04-21 Luna bug): the LLM would open with
+# "Oh, hello there!" on turn 3 of a continuing conversation, ignoring
+# the chat_history. Compile-time metric rejects these so BootstrapFewShot
+# never promotes a greeting-opener response into the demo pool.
+_GREETING_OPENERS = (
+    "oh, hello",
+    "hi there",
+    "hello there",
+    "hello,",
+    "hi,",
+    "welcome",
+    "nice to meet",
+)
+
+
+def _opens_with_greeting(text: str) -> bool:
+    """True if the first non-whitespace token is a cold-start greeting."""
+    return any(text.lstrip().lower().startswith(g) for g in _GREETING_OPENERS)
+
+
 def perspective_shift_metric(example, pred, trace=None) -> bool:
     """
     True when:
-      1. character_principle is grounded (mentions specific events, not generic)
-      2. applied_insight is actionable (>80 chars, not just "be brave")
-      3. reasoning bridges character to scenario (>50 chars)
-      4. citations present (character grounded in corpus)
+      1. character_principle is grounded (>= 50 chars, specific)
+      2. applied_insight is actionable (>= 80 chars, not just "be brave")
+      3. reasoning bridges character to scenario (>= 50 chars)
+      4. character_response is substantive (>= 100 chars) — the synthesis
+         field added in PR #21; without checking it, the metric rewards
+         good analytical fields even when the user-facing voice is bad
+      5. citations present (character grounded in corpus)
+      6. MULTI-TURN GUARD: if example.chat_history is non-empty, the
+         character_response must NOT open with a greeting. Enforces the
+         no-cold-start rule at compile time so demos selected by
+         BootstrapFewShot don't reinforce the bug the 2026-04-21 Luna
+         observation surfaced.
     """
     principle = getattr(pred, "character_principle", "") or ""
     insight = getattr(pred, "applied_insight", "") or ""
     reasoning = getattr(pred, "reasoning", "") or ""
+    char_response = getattr(pred, "character_response", "") or ""
     citations = getattr(pred, "citations", "") or ""
 
     if len(principle) < 50:
@@ -230,8 +260,16 @@ def perspective_shift_metric(example, pred, trace=None) -> bool:
         return False
     if len(reasoning) < 50:
         return False
+    if len(char_response.strip()) < 100:
+        return False
     if not citations or citations.strip() == "none":
         return False
+
+    # Multi-turn greeting guard
+    chat_history = getattr(example, "chat_history", "") or ""
+    if chat_history.strip() and _opens_with_greeting(char_response):
+        return False
+
     return True
 
 

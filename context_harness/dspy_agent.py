@@ -641,6 +641,18 @@ class DSPyAgent:
             self._modules["satirical_podcast"], trainset=trainset
         )
 
+    def compile_perspective_shift(self, optimizer: dspy.teleprompt.Teleprompter, trainset: list) -> None:
+        """Run the optimizer on the perspective_shift module and update in place.
+
+        Uses both the single-turn and multi-turn examples in
+        data/trainset_perspective_shift.py. The multi-turn examples are
+        the ones that teach "no greeting on turn 2+" — the metric
+        (perspective_shift_metric) enforces this at compile time.
+        """
+        self._modules["perspective_shift"] = optimizer.compile(
+            self._modules["perspective_shift"], trainset=trainset
+        )
+
 
 # ---------------------------------------------------------------------------
 # Router helpers

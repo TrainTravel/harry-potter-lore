@@ -1,27 +1,36 @@
 """
 Training data — Perspective Shift mode
 =======================================
-Hand-labelled examples for the `perspective_shift` mode, where a modern
-real-life scenario is re-framed through the lens of a specific HP character
-whose canonical traits illuminate it.
+Examples for the `perspective_shift` mode, where a real-life scenario is
+re-framed through the lens of a specific HP character. Two kinds:
 
-Each example specifies:
-  - scenario: a concrete, adult, real-life problem (1–3 sentences)
-  - character: a character slug the mode will borrow as a lens
-  - expected_citations: space-separated chunk_ids that good answers should
-    ground the character's voice in (pattern: `{character}/{section}-NNN`)
+  1. **Single-turn (21 examples)** — inputs only. BootstrapFewShot runs
+     the Module on each and keeps the passing traces as demos.
+     `expected_citations` is documentation, not a metric input.
 
-The `answer` / reframe field is intentionally left for BootstrapFewShot to
-generate — we only label what is cheap and objective (citations) so the
-metric can check that the reframe is actually anchored in canon.
+  2. **Multi-turn (8 examples, added 2026-04-23)** — inputs + fully
+     labelled outputs. Every Signature output field is populated:
+     character_principle, applied_insight, reasoning, character_response,
+     citations. These populate BootstrapFewShot's `max_labeled_demos`
+     slot — fully-labelled examples can be used as demos verbatim
+     without running the Module at compile time.
 
-Valid character slugs (11):
+Multi-turn examples target the 2026-04-21 regression where Luna opened
+turn-3 with "Oh, hello there!" — a cold-start greeting that ignored
+chat_history. Each multi-turn demo shows: no greeting, direct engagement
+with the prior turn, voice continuity.
+
+perspective_shift_metric rejects demos whose character_response opens
+with a greeting when chat_history is non-empty, so the compile pass
+won't promote a cold-start-tone trace.
+
+Valid character slugs:
     harry-potter, hermione-granger, ron-weasley, albus-dumbledore,
     severus-snape, minerva-mcgonagall, luna-lovegood, neville-longbottom,
     lord-voldemort, draco-malfoy, rubeus-hagrid
 
-Citation chunk_ids come from data/character_lore_tagged.jsonl. Each is of the
-form `{character-slug}/{section-slug}-NNN`; 1–3 per example is enough.
+Citation format (output side): ``[{slug}/{section}-NNN]`` — each doc_id
+in square brackets, matching the Signature's citations field description.
 """
 
 from __future__ import annotations
@@ -267,6 +276,7 @@ TRAINSET = [
             "wouldn't dare bring to dinner?"
         ),
         expected_citations="luna-lovegood/personality-and-traits-001",
+        citations="[luna-lovegood/personality-and-traits-001]",
     ).with_inputs("scenario", "character", "chat_history"),
 
     # --- Dumbledore continuation ---
@@ -304,6 +314,7 @@ TRAINSET = [
             "has not dared to say. Which was which?"
         ),
         expected_citations="albus-dumbledore/personality-and-traits-001",
+        citations="[albus-dumbledore/personality-and-traits-001]",
     ).with_inputs("scenario", "character", "chat_history"),
 
     # --- Snape continuation ---
@@ -338,6 +349,7 @@ TRAINSET = [
             "what I had. It was enough."
         ),
         expected_citations="severus-snape/relationships-lily-evans-001 severus-snape/personality-and-traits-001",
+        citations="[severus-snape/relationships-lily-evans-001] [severus-snape/personality-and-traits-001]",
     ).with_inputs("scenario", "character", "chat_history"),
 
     # --- McGonagall continuation ---
@@ -372,6 +384,7 @@ TRAINSET = [
             "dressed as kindness — and they would know."
         ),
         expected_citations="minerva-mcgonagall/personality-and-traits-001",
+        citations="[minerva-mcgonagall/personality-and-traits-001]",
     ).with_inputs("scenario", "character", "chat_history"),
 
     # --- Hagrid continuation ---
@@ -409,6 +422,7 @@ TRAINSET = [
             "summat hurt?"
         ),
         expected_citations="rubeus-hagrid/personality-and-traits-001",
+        citations="[rubeus-hagrid/personality-and-traits-001]",
     ).with_inputs("scenario", "character", "chat_history"),
 
     # --- Hermione continuation ---
@@ -444,6 +458,7 @@ TRAINSET = [
             "having nothing clever. It passes faster than you think."
         ),
         expected_citations="hermione-granger/personality-and-traits-001",
+        citations="[hermione-granger/personality-and-traits-001]",
     ).with_inputs("scenario", "character", "chat_history"),
 
     # --- Harry continuation ---
@@ -481,6 +496,7 @@ TRAINSET = [
             "someone who can fix it. It needs to be someone who can know it."
         ),
         expected_citations="harry-potter/personality-and-traits-001",
+        citations="[harry-potter/personality-and-traits-001]",
     ).with_inputs("scenario", "character", "chat_history"),
 
     # --- Ron continuation ---
@@ -519,6 +535,7 @@ TRAINSET = [
             "siblings probably wouldn't have been? That's the axis."
         ),
         expected_citations="ron-weasley/personality-and-traits-001",
+        citations="[ron-weasley/personality-and-traits-001]",
     ).with_inputs("scenario", "character", "chat_history"),
 ]
 
@@ -533,6 +550,7 @@ EVALSET = [
         scenario="I've been offered a senior role at a company I don't respect. The money would let me buy my mother a house. I'd wake up every day already ashamed.",
         character="albus-dumbledore",
         expected_citations="albus-dumbledore/biography-aftermath-turning-down-power-001 albus-dumbledore/personality-and-traits-001",
+        citations="[albus-dumbledore/biography-aftermath-turning-down-power-001] [albus-dumbledore/personality-and-traits-001]",
         chat_history="",
     ).with_inputs("scenario", "character", "chat_history"),
 
@@ -541,6 +559,7 @@ EVALSET = [
         scenario="My ex married someone new last month. I thought I was over it. I cried in a supermarket seeing his favourite cereal.",
         character="severus-snape",
         expected_citations="severus-snape/relationships-lily-evans-001",
+        citations="[severus-snape/relationships-lily-evans-001]",
         chat_history="",
     ).with_inputs("scenario", "character", "chat_history"),
 
@@ -549,6 +568,7 @@ EVALSET = [
         scenario="My mother has early-onset dementia and already doesn't recognise me some days. I'm mourning someone who's still alive and no one has language for that.",
         character="harry-potter",
         expected_citations="harry-potter/personality-and-traits-001 harry-potter/biography-hogwarts-years-fifth-year-1995-1996-christmas-on-the-closed-ward-001",
+        citations="[harry-potter/personality-and-traits-001] [harry-potter/biography-hogwarts-years-fifth-year-1995-1996-christmas-on-the-closed-ward-001]",
         chat_history="",
     ).with_inputs("scenario", "character", "chat_history"),
 
@@ -557,6 +577,7 @@ EVALSET = [
         scenario="I'm the first person in my family to finish university. At work I still feel like I'm performing 'educated' in a language everyone else was born speaking.",
         character="hermione-granger",
         expected_citations="hermione-granger/biography-early-life-001 hermione-granger/personality-and-traits-001",
+        citations="[hermione-granger/biography-early-life-001] [hermione-granger/personality-and-traits-001]",
         chat_history="",
     ).with_inputs("scenario", "character", "chat_history"),
 
@@ -565,6 +586,7 @@ EVALSET = [
         scenario="Everyone in my friend group is getting married and having babies. I don't want either and I've started feeling like I'm failing a test nobody told me I was taking.",
         character="luna-lovegood",
         expected_citations="luna-lovegood/personality-and-traits-001 luna-lovegood/biography-later-life-001",
+        citations="[luna-lovegood/personality-and-traits-001] [luna-lovegood/biography-later-life-001]",
         chat_history="",
     ).with_inputs("scenario", "character", "chat_history"),
 
@@ -573,6 +595,7 @@ EVALSET = [
         scenario="I'm the head of a small team and my own boss keeps asking me to enforce policies I disagree with. My team is starting to see me as the enemy.",
         character="minerva-mcgonagall",
         expected_citations="minerva-mcgonagall/biography-early-career-at-hogwarts-001 minerva-mcgonagall/relationships-dolores-umbridge-001",
+        citations="[minerva-mcgonagall/biography-early-career-at-hogwarts-001] [minerva-mcgonagall/relationships-dolores-umbridge-001]",
         chat_history="",
     ).with_inputs("scenario", "character", "chat_history"),
 
@@ -581,6 +604,7 @@ EVALSET = [
         scenario="All my college friends are in crypto and keep mocking me for 'playing it safe'. I want out of the group chat but they're my oldest friends.",
         character="draco-malfoy",
         expected_citations="draco-malfoy/personality-and-traits-001 draco-malfoy/relationships-vincent-crabbe-and-gregory-goyle-001",
+        citations="[draco-malfoy/personality-and-traits-001] [draco-malfoy/relationships-vincent-crabbe-and-gregory-goyle-001]",
         chat_history="",
     ).with_inputs("scenario", "character", "chat_history"),
 
@@ -589,6 +613,7 @@ EVALSET = [
         scenario="I adopted a reactive rescue dog everyone keeps telling me to rehome. He's difficult and I love him and I can't tell if I'm being loyal or stubborn.",
         character="rubeus-hagrid",
         expected_citations="rubeus-hagrid/personality-and-traits-001",
+        citations="[rubeus-hagrid/personality-and-traits-001]",
         chat_history="",
     ).with_inputs("scenario", "character", "chat_history"),
 ]
