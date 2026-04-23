@@ -85,7 +85,17 @@ class PerspectiveShiftSignature(dspy.Signature):
     scenario:  str = dspy.InputField(desc="the real-world situation or question")
     character: str = dspy.InputField(desc="the HP character whose perspective to apply")
     context:   str = dspy.InputField(desc="retrieved lore passages about this character, each prefixed [doc_id]")
-    chat_history: str = dspy.InputField(desc="prior perspective-shift turns in this conversation (may be empty). When present, the user is likely asking a follow-up on the same character's view — build on the earlier principle rather than restating it.")
+    chat_history: str = dspy.InputField(desc=(
+        "Prior perspective-shift turns in this conversation (may be empty). "
+        "When present, this is a continuation of an ongoing dialogue. "
+        "Rules: NEVER open with a greeting ('Oh hello', 'Hello there', "
+        "'Hi', 'Welcome'). NEVER reintroduce the character ('As Luna, I...'). "
+        "NEVER reset the conversation — do not treat a terse reply ('nothing', "
+        "'love', 'I don't know') as a new topic; interpret it as an answer to "
+        "the prior turn's follow-up question. Directly engage with what the "
+        "user just said, reference the prior turn if relevant, and continue "
+        "the same unfolding conversation."
+    ))
 
     character_principle: str = dspy.OutputField(
         desc=("2-3 sentences. The core principle this character embodies, anchored "
@@ -112,7 +122,12 @@ class PerspectiveShiftSignature(dspy.Signature):
               "'you'. Match this character's known cadence and vocabulary "
               "(Dumbledore: reflective, aphoristic; McGonagall: direct, dry; "
               "Luna: oblique, unexpected). End with a single concrete question "
-              "or stance — not a summary.")
+              "or stance — not a summary. "
+              "If chat_history above is non-empty, this is a follow-up turn: "
+              "do NOT open with a greeting, do NOT re-introduce yourself, do "
+              "NOT reset to a cold-start tone. Directly engage with what the "
+              "user said; if they replied tersely, interpret their reply as an "
+              "answer to your prior question and continue the thread.")
     )
     citations: str = dspy.OutputField(
         desc=("Space-separated doc_ids formatted as [doc-id], each in square "
@@ -624,6 +639,18 @@ class DSPyAgent:
         """Run the optimizer on the satirical_podcast module and update in place."""
         self._modules["satirical_podcast"] = optimizer.compile(
             self._modules["satirical_podcast"], trainset=trainset
+        )
+
+    def compile_perspective_shift(self, optimizer: dspy.teleprompt.Teleprompter, trainset: list) -> None:
+        """Run the optimizer on the perspective_shift module and update in place.
+
+        Uses both the single-turn and multi-turn examples in
+        data/trainset_perspective_shift.py. The multi-turn examples are
+        the ones that teach "no greeting on turn 2+" — the metric
+        (perspective_shift_metric) enforces this at compile time.
+        """
+        self._modules["perspective_shift"] = optimizer.compile(
+            self._modules["perspective_shift"], trainset=trainset
         )
 
 

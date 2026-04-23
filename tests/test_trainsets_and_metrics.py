@@ -8,6 +8,7 @@ from context_harness.metrics import (
     socratic_metric, socratic_score,
     debate_metric, debate_score,
     satirical_podcast_metric, satirical_podcast_score,
+    perspective_shift_metric,
 )
 
 
@@ -355,3 +356,99 @@ def test_satirical_podcast_score_rewards_quality():
         citations="",
     )
     assert satirical_podcast_score(None, good) > satirical_podcast_score(None, bad)
+
+
+# ---------------------------------------------------------------------------
+# perspective_shift_metric — multi-turn greeting guard + character_response
+# substance check (added 2026-04-23 per PR #26 review findings)
+# ---------------------------------------------------------------------------
+
+def _good_pshift_pred(**overrides):
+    """A prediction that passes all perspective_shift_metric length checks.
+    Override specific fields per-test."""
+    base = dict(
+        character_principle="A principle at least fifty characters long referencing specific canon.",
+        applied_insight="An actionable insight that exceeds eighty characters by design, giving a specific stance the user can take this week about their situation.",
+        reasoning="Reasoning that bridges character to scenario in at least fifty characters of prose.",
+        character_response=(
+            "First-person response from the character, at least one hundred "
+            "characters of substance, weaving canon naturally without "
+            "greeting openers or section labels."
+        ),
+        citations="[character/section-001]",
+    )
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
+def test_perspective_shift_passes_well_formed_single_turn():
+    """Baseline: a full prediction with empty chat_history should pass."""
+    example = SimpleNamespace(chat_history="")
+    pred = _good_pshift_pred()
+    assert perspective_shift_metric(example, pred) is True
+
+
+def test_perspective_shift_rejects_short_character_response():
+    """character_response < 100 chars fails — the synthesis field must be
+    substantive. Regression guard: pre-review, the metric ignored this
+    field entirely and would pass demos with bad voice."""
+    example = SimpleNamespace(chat_history="")
+    pred = _good_pshift_pred(character_response="Short reply.")
+    assert perspective_shift_metric(example, pred) is False
+
+
+def test_perspective_shift_rejects_greeting_opener_on_multi_turn():
+    """The load-bearing regression guard for this PR. When chat_history is
+    non-empty, character_response starting with 'Oh, hello there!' (or
+    similar cold-start greetings) must fail the metric so BootstrapFewShot
+    never promotes such a response as a demo. Regression target:
+    2026-04-21 Luna bug."""
+    example = SimpleNamespace(chat_history="[1] User: I'm dealing with imposter syndrome.\n     Tutor: ...")
+    for opener in [
+        "Oh, hello there! I'm delighted you've come to see me. Let me tell you about...",
+        "Hi there, friend! Today we'll discuss imposter syndrome from Luna's perspective and...",
+        "Hello, welcome to our conversation. I wanted to reintroduce myself before we continue and...",
+        "Welcome back! It's wonderful to see you again. Now, about your question on imposter...",
+    ]:
+        pred = _good_pshift_pred(character_response=opener)
+        assert perspective_shift_metric(example, pred) is False, \
+            f"Greeting opener should be rejected: {opener!r}"
+
+
+def test_perspective_shift_allows_greeting_opener_on_cold_start():
+    """When chat_history is empty, the greeting guard does NOT fire — a
+    character greeting a first-time user is legitimate. Only multi-turn
+    context triggers the no-greeting rule."""
+    example = SimpleNamespace(chat_history="")
+    pred = _good_pshift_pred(
+        character_response=(
+            "Oh, hello there! I sense something weighing on you. Let me share "
+            "what my own life has taught me about this sort of question. "
+            "Sometimes the Wrackspurts cloud our judgement in these moments."
+        ),
+    )
+    assert perspective_shift_metric(example, pred) is True
+
+
+def test_perspective_shift_still_rejects_missing_citations():
+    """Existing check preserved: no citations → fail."""
+    example = SimpleNamespace(chat_history="")
+    pred = _good_pshift_pred(citations="")
+    assert perspective_shift_metric(example, pred) is False
+    pred = _good_pshift_pred(citations="none")
+    assert perspective_shift_metric(example, pred) is False
+
+
+def test_perspective_shift_multi_turn_without_greeting_passes():
+    """Positive case for multi-turn: chat_history present + response
+    continues without greeting → passes."""
+    example = SimpleNamespace(chat_history="[1] User: I'm tired.\n     Tutor: ...")
+    pred = _good_pshift_pred(
+        character_response=(
+            "Tired. Yes. I know that word intimately. Hear me carefully: "
+            "usefulness does not require you to feel capable. It requires "
+            "only that you do one small thing tomorrow, unnoticed, that you "
+            "would have done for them. That is what I had. It was enough."
+        ),
+    )
+    assert perspective_shift_metric(example, pred) is True

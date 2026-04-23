@@ -26,7 +26,14 @@ from dspy.teleprompt import BootstrapFewShot
 
 from .ingest_lore import build_pipeline
 from .dspy_agent import DSPyAgent
-from .metrics import deep_research_metric, socratic_metric, exam_grader_metric, debate_metric, satirical_podcast_metric
+from .metrics import (
+    deep_research_metric,
+    socratic_metric,
+    exam_grader_metric,
+    debate_metric,
+    satirical_podcast_metric,
+    perspective_shift_metric,
+)
 
 
 def main() -> int:
@@ -51,6 +58,7 @@ def main() -> int:
     from data.trainset_exam_grader import TRAINSET as grader_trainset
     from data.trainset_debate import TRAINSET as debate_trainset
     from data.trainset_satirical_podcast import TRAINSET as podcast_trainset
+    from data.trainset_perspective_shift import TRAINSET as pshift_trainset
 
     print("Building ChromaDB-backed pipeline...")
     pipeline = build_pipeline(persist=True)
@@ -98,7 +106,7 @@ def main() -> int:
     print("  ✓ debate compiled")
 
     # ----- Compile satirical_podcast -----
-    print(f"\n[5/5] Compiling satirical_podcast ({len(podcast_trainset)} examples)...")
+    print(f"\n[5/6] Compiling satirical_podcast ({len(podcast_trainset)} examples)...")
     podcast_optimizer = BootstrapFewShot(
         metric=satirical_podcast_metric,
         max_bootstrapped_demos=args.max_demos,
@@ -106,6 +114,21 @@ def main() -> int:
     )
     agent.compile_satirical_podcast(podcast_optimizer, trainset=podcast_trainset)
     print("  ✓ satirical_podcast compiled")
+
+    # ----- Compile perspective_shift -----
+    # Trainset includes multi-turn examples (chat_history populated). Metric
+    # enforces: principle/insight/reasoning length + character_response
+    # substance + citations + NO greeting opener when chat_history is
+    # non-empty. Together this produces demos that teach authentic voice
+    # + continuation discipline on turn 2+.
+    print(f"\n[6/6] Compiling perspective_shift ({len(pshift_trainset)} examples)...")
+    pshift_optimizer = BootstrapFewShot(
+        metric=perspective_shift_metric,
+        max_bootstrapped_demos=args.max_demos,
+        max_labeled_demos=args.max_labeled,
+    )
+    agent.compile_perspective_shift(pshift_optimizer, trainset=pshift_trainset)
+    print("  ✓ perspective_shift compiled")
 
     # ----- Save -----
     print(f"\nSaving compiled agent to {args.out}/ ...")
@@ -115,6 +138,7 @@ def main() -> int:
     print("  ✓ exam_grader.json")
     print("  ✓ debate.json")
     print("  ✓ satirical_podcast.json")
+    print("  ✓ perspective_shift.json")
     print("  ✓ manifest.json")
     print("\nDone.")
     return 0
