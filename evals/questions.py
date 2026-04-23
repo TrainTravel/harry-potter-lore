@@ -161,6 +161,18 @@ QUESTIONS: List[EvalQuestion] = [
         expected_docs=set(),
         reference_answer="The corpus does not contain this information (no mention of phoenix feather cores or Fawkes).",
     ),
+
+    # ---- q21: added 2026-04-23 after real user hit corpus gap ----
+    # Origin: a friend asked about Quidditch history via the Lovable demo;
+    # corpus only had incidental Quidditch mentions in character bios.
+    # Added data/hp_lore.txt `doc_id: quidditch` section + this question as
+    # regression guard. Pattern: real observed gap → corpus + eval coverage.
+    EvalQuestion(
+        id="q21", kind="easy",
+        question="What is the origin of the Quidditch game, and what are its basic rules?",
+        expected_docs={"quidditch"},
+        reference_answer="Quidditch traces to Queerditch Marsh in the 11th century, first documented by Gertie Keddle. Two teams of seven (Keeper, three Chasers, two Beaters, Seeker) use four balls (Quaffle, two Bludgers, Golden Snitch). Quaffle goals = 10 pts through one of three hoops; the Snitch ends the match and awards 150 pts.",
+    ),
 ]
 
 
