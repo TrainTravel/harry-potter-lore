@@ -21,9 +21,8 @@ list/
 # don't commit snapshots since they drift out of sync with runner code
 evals/results.json
 evals/results_dspy_*.json
-# Compiled DSPy agent (large JSON, per-user)
-my_profile.agent/
-*.agent/
+# Compiled DSPy agent — tracked so Railway deploys include few-shot demos
+# my_profile.agent/
 # Scala build artifacts
 scala-harness/project/target/
 scala-harness/project/project/

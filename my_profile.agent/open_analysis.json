@@ -1,0 +1,52 @@
+{
+  "predict.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [],
+    "signature": {
+      "instructions": "Analytical mode: use retrieved lore as a factual foundation, then draw on\nyour broader knowledge (psychology, literary theory, history, philosophy) to\nprovide deep analysis. Clearly mark which parts come from the corpus vs your\nown reasoning. Do not refuse to answer — if the corpus is thin, lean on your\ngeneral knowledge and say so.\n\nMulti-turn aware: ``chat_history`` carries prior exchanges in this session.\nWhen the user asks a follow-up like \"so what did you mean earlier about X\",\nuse the history to pick up the thread rather than restarting from scratch.",
+      "fields": [
+        {
+          "prefix": "Question:",
+          "description": "the analytical question"
+        },
+        {
+          "prefix": "Context:",
+          "description": "retrieved lore passages for grounding, each prefixed [doc_id]"
+        },
+        {
+          "prefix": "Chat History:",
+          "description": "prior analysis turns in this conversation (may be empty for a new thread). When present, treat the current question as a continuation — reference or refine your earlier points rather than repeating them."
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Analysis:",
+          "description": "3-5 sentences. Direct analysis blending corpus facts with broader knowledge. Commit to a position. Avoid hedging ('it's important to...') and avoid restating the question."
+        },
+        {
+          "prefix": "Corpus Facts:",
+          "description": "2-3 sentences. ONLY facts drawn from [doc_id] chunks in context. Cite them."
+        },
+        {
+          "prefix": "Own Reasoning:",
+          "description": "2-3 sentences. Claims NOT in the corpus — your broader knowledge, explicitly marked as interpretation."
+        },
+        {
+          "prefix": "Citations:",
+          "description": "Space-separated doc_ids formatted as [doc-id], each in square brackets. Use ONLY doc_ids that appear in the context field. Output 'none' if the answer relies entirely on general knowledge."
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.12",
+      "dspy": "3.1.3",
+      "cloudpickle": "3.1"
+    }
+  }
+}
