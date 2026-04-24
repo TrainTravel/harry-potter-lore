@@ -232,6 +232,44 @@ def _opens_with_greeting(text: str) -> bool:
     return any(text.lstrip().lower().startswith(g) for g in _GREETING_OPENERS)
 
 
+# Patterns that signal the user is asking for reflection / summary.
+_REFLECTION_TRIGGERS = (
+    "summarize",
+    "summarise",
+    "what have i told you",
+    "what did i tell you",
+    "what did i say",
+    "what have i said",
+    "reflect back",
+    "recap",
+    "my situation",
+    "what do you know about me",
+)
+
+# Common words to ignore when measuring content overlap.
+_STOPWORDS = frozenset(
+    "i me my you your a an the is am are was were be been being "
+    "do does did have has had it its in on at to for of and or but "
+    "not no so if by with from that this these those than then "
+    "about just really very also too all both each "
+    "what when where who how which why would could should can may "
+    "will shall might must well most more some any our her him his "
+    "them they she he we us them into out up even still yet".split()
+)
+
+
+def _is_reflection_request(scenario: str) -> bool:
+    """True when the user's scenario looks like a reflection / summary ask."""
+    lower = scenario.lower()
+    return any(trigger in lower for trigger in _REFLECTION_TRIGGERS)
+
+
+def _content_words(text: str) -> set[str]:
+    """Extract lowercased non-stop content words (3+ chars) from text."""
+    words = re.findall(r"[a-z]{3,}", text.lower())
+    return {w for w in words if w not in _STOPWORDS}
+
+
 def perspective_shift_metric(example, pred, trace=None) -> bool:
     """
     True when:
@@ -269,6 +307,17 @@ def perspective_shift_metric(example, pred, trace=None) -> bool:
     chat_history = getattr(example, "chat_history", "") or ""
     if chat_history.strip() and _opens_with_greeting(char_response):
         return False
+
+    # Reflection guard: when the user explicitly asks for a summary /
+    # reflection, the character_response must echo back content from the
+    # chat_history — at least 3 overlapping content words. A response that
+    # ignores the user's prior turns entirely fails.
+    scenario = getattr(example, "scenario", "") or ""
+    if chat_history.strip() and _is_reflection_request(scenario):
+        history_words = _content_words(chat_history)
+        response_words = _content_words(char_response)
+        if len(history_words & response_words) < 3:
+            return False
 
     return True
 

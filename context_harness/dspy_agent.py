@@ -127,7 +127,13 @@ class PerspectiveShiftSignature(dspy.Signature):
               "do NOT open with a greeting, do NOT re-introduce yourself, do "
               "NOT reset to a cold-start tone. Directly engage with what the "
               "user said; if they replied tersely, interpret their reply as an "
-              "answer to your prior question and continue the thread.")
+              "answer to your prior question and continue the thread. "
+              "When the user explicitly asks you to summarize, reflect back, "
+              "paraphrase what they've shared, or recall their situation, open "
+              "the response by restating their scenario in your own voice, still "
+              "fully in character. Then transition to a brief insight or question. "
+              "The reflection replaces the usual advice-first pattern for that "
+              "turn only.")
     )
     citations: str = dspy.OutputField(
         desc=("Space-separated doc_ids formatted as [doc-id], each in square "
