@@ -12,7 +12,7 @@ from context_harness.rag_pipeline import ChunkingStrategy
 
 @pytest.fixture(scope="module")
 def loaded_pipeline():
-    """Ingest all 10 HP lore documents into an ephemeral ChromaDB."""
+    """Ingest all 11 HP lore documents into an ephemeral ChromaDB."""
     pipeline = build_pipeline(persist=False)
     registry = DocumentRegistry(
         pipeline=pipeline,
@@ -27,14 +27,14 @@ def loaded_pipeline():
 
 def test_chromadb_indexed_all_documents(loaded_pipeline):
     pipeline, registry = loaded_pipeline
-    assert pipeline.count() == 10
+    assert pipeline.count() == 11
 
 
 def test_registry_tracks_all_documents(loaded_pipeline):
     _, registry = loaded_pipeline
     stats = registry.stats()
-    assert stats["doc_count"] == 10
-    assert stats["total_chunks"] == 10
+    assert stats["doc_count"] == 11
+    assert stats["total_chunks"] == 11
 
 
 def test_retrieve_dumbledore_query(loaded_pipeline):
