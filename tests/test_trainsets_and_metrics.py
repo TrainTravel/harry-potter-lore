@@ -452,3 +452,109 @@ def test_perspective_shift_multi_turn_without_greeting_passes():
         ),
     )
     assert perspective_shift_metric(example, pred) is True
+
+
+def test_perspective_shift_rejects_deflection_on_reflection_request():
+    """When the user asks to summarize their situation, a response that
+    ignores what they shared (zero content overlap with chat_history)
+    should fail. This is the bug this feature fixes."""
+    example = SimpleNamespace(
+        scenario="can you summarize my situation?",
+        chat_history=(
+            "[1] User: I have a safe job offer and a risky creative path.\n"
+            "     Tutor: What does the safe path cost you in ten years?\n"
+            "[2] User: Probably just regret. The creative path could cost "
+            "me stability."
+        ),
+    )
+    pred = _good_pshift_pred(
+        character_response=(
+            "Ah, courage is a curious thing. One must always remember that "
+            "it is our choices that show what we truly are, far more than "
+            "our abilities. The world offers many roads and each has its "
+            "own particular enchantment. What matters is the heart."
+        ),
+    )
+    assert perspective_shift_metric(example, pred) is False
+
+
+def test_perspective_shift_passes_reflection_with_content_echo():
+    """When the user asks for a summary and the response restates their
+    scenario using content words from chat_history, the metric passes."""
+    example = SimpleNamespace(
+        scenario="can you summarize my situation?",
+        chat_history=(
+            "[1] User: I have a safe job offer and a risky creative path.\n"
+            "     Tutor: What does the safe path cost you in ten years?\n"
+            "[2] User: Probably just regret. The creative path could cost "
+            "me stability."
+        ),
+    )
+    pred = _good_pshift_pred(
+        character_response=(
+            "Of course. You came to me torn between a safe career and a "
+            "creative path that excites you but offers no guarantees. When "
+            "I asked what the safe road costs, you said regret — and when "
+            "you looked at the creative road, you said stability. I turned "
+            "down the most powerful position in our world because I knew "
+            "what it would quietly take from me. Which of those two costs "
+            "are you more practised at surviving?"
+        ),
+    )
+    assert perspective_shift_metric(example, pred) is True
+
+
+def test_perspective_shift_reflection_multi_turn_real_length():
+    """Regression test: a long multi-turn conversation where the user asks
+    'can you summarize my situation?'. A deflecting response that ignores
+    the user's content should fail; a reflecting response that echoes key
+    details should pass."""
+    chat_history = (
+        "[1] User: My colleague praised my work publicly but takes credit "
+        "for it in private meetings with management. I confronted them "
+        "and they called me paranoid.\n"
+        "     Tutor: What happened when you confronted them?\n"
+        "[2] User: They said I was imagining things and that credit "
+        "doesn't matter.\n"
+        "     Tutor: Has anyone else noticed the pattern?\n"
+        "[3] User: My teammate mentioned it once but didn't want to "
+        "get involved.\n"
+        "     Tutor: What did your manager say when you raised it?\n"
+        "[4] User: I haven't raised it with my manager yet. I'm afraid "
+        "of looking petty.\n"
+        "     Tutor: What would change if your manager knew?"
+    )
+    example = SimpleNamespace(
+        scenario="can you summarize my situation?",
+        chat_history=chat_history,
+    )
+
+    # BAD: deflects with HP analogies, never restates the user's story
+    deflecting_pred = _good_pshift_pred(
+        character_response=(
+            "Well, sometimes the most important thing is to trust your "
+            "instincts. When Ron and I had our difficulties, I learned "
+            "that clarity comes from within, not from others. The heart "
+            "knows what the mind refuses to accept. You must be brave "
+            "enough to face the truth, whatever it may be. What do you "
+            "think your next step should be?"
+        ),
+    )
+    assert perspective_shift_metric(example, deflecting_pred) is False, \
+        "Deflecting response should fail — no content from user's story echoed"
+
+    # GOOD: restates the user's situation using their own content words
+    reflecting_pred = _good_pshift_pred(
+        character_response=(
+            "Let me lay it out plainly. Your colleague takes credit for "
+            "your work in private meetings while praising you publicly. "
+            "When you confronted them, they called you paranoid. Your "
+            "teammate noticed but won't get involved, and you haven't "
+            "raised it with your manager because you're afraid of looking "
+            "petty. I understand that fear — I spent years watching others "
+            "take credit for work that wasn't theirs. The question is "
+            "whether staying quiet costs you more than speaking up."
+        ),
+    )
+    assert perspective_shift_metric(example, reflecting_pred) is True, \
+        "Reflecting response should pass — echoes user's content words"

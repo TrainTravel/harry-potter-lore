@@ -74,6 +74,11 @@ _DUMMY_ANSWER = {
     "character_principle": "Dumbledore consistently chose what was right over what was easy, even at great personal cost.",
     "applied_insight": "When paralyzed by a decision, identify the option whose difficulty comes from moral weight rather than mere inconvenience — that is often the right one.",
     "reasoning": "Dumbledore's choice to withhold the prophecy and bear its weight alone maps to any situation where integrity demands carrying a burden rather than offloading it.",
+    "character_response": (
+        "I know that weight well. The question is not whether you carry it — "
+        "you will. The question is whether you carry it for the right reasons. "
+        "Do one thing tomorrow. Not a grand thing. One small brave thing."
+    ),
     # reasoning trace (DSPy ChainOfThought always emits this)
     "reasoning": "Step-by-step reasoning trace.",
 }
