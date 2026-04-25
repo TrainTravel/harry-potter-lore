@@ -1,0 +1,33 @@
+name: Post-deploy smoke test
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  smoke:
+    name: Smoke test (perspective_shift reflection)
+    runs-on: ubuntu-latest
+    # Gate: only run when RAILWAY_URL is configured in repo variables.
+    # Forks and repos without a deployed instance will skip this job.
+    if: ${{ vars.RAILWAY_URL != '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests litellm
+
+      - name: Wait for Railway deploy
+        run: sleep 90
+
+      - name: Run smoke test
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python scripts/smoke_test.py --base-url ${{ vars.RAILWAY_URL }}

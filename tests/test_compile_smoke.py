@@ -29,6 +29,7 @@ from context_harness.dspy_agent import (
     PerspectiveShiftModule,
     _primary_input_field,
 )
+from context_harness.intent_router import IntentRouterModule
 from context_harness.metrics import (
     deep_research_metric,
     socratic_metric,
@@ -36,6 +37,7 @@ from context_harness.metrics import (
     debate_metric,
     satirical_podcast_metric,
     perspective_shift_metric,
+    intent_router_metric,
 )
 from context_harness.ingest_lore import build_pipeline, parse_lore_file, LORE_FILE
 
@@ -79,6 +81,9 @@ _DUMMY_ANSWER = {
         "you will. The question is whether you carry it for the right reasons. "
         "Do one thing tomorrow. Not a grand thing. One small brave thing."
     ),
+    # intent_router
+    "mode": "deep_research",
+    "kwargs_json": "{}",
     # reasoning trace (DSPy ChainOfThought always emits this)
     "reasoning": "Step-by-step reasoning trace.",
 }
@@ -173,6 +178,31 @@ def test_perspective_shift_compile(pipeline):
 # Canonical-rule invariant: router introspection must find a primary input
 # field for every mode, and that field must be a real forward() parameter.
 # ---------------------------------------------------------------------------
+
+def test_intent_router_compile():
+    """IntentRouterModule must survive BootstrapFewShot under DummyLM."""
+    from data.trainset_intent_router import TRAINSET
+    module = IntentRouterModule()
+    compiled = _optimizer(intent_router_metric).compile(module, trainset=TRAINSET[:2])
+    assert compiled is not None
+
+
+def test_intent_router_primary_input_field():
+    """Verify Signature primary input is 'user_message' and forward() accepts it."""
+    import inspect
+    module = IntentRouterModule()
+    sig = module.predict.predictors()[0].signature
+    non_context_inputs = [name for name in sig.input_fields if name != "context"]
+    assert non_context_inputs[0] == "user_message", (
+        f"IntentRouterSignature primary input is {non_context_inputs[0]!r}, "
+        f"expected 'user_message'"
+    )
+    params = inspect.signature(module.forward).parameters
+    assert "user_message" in params, (
+        "IntentRouterModule.forward() has no parameter named 'user_message'. "
+        "This violates the Signature-is-canonical rule."
+    )
+
 
 @pytest.mark.parametrize("module_cls,expected_primary", [
     (DeepResearchModule,     "question"),

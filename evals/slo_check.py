@@ -33,6 +33,7 @@ from context_harness.metrics import (
     deep_research_metric,
     socratic_metric,
     debate_metric,
+    intent_router_metric,
 )
 
 # ---------------------------------------------------------------------------
@@ -57,6 +58,12 @@ MODE_CONFIG = {
         "metric": debate_metric,
         "input_field": "position",
         "default_slo": 0.60,
+    },
+    "intent_router": {
+        "trainset_module": "data.trainset_intent_router",
+        "metric": intent_router_metric,
+        "input_field": "user_message",
+        "default_slo": 0.80,
     },
 }
 
@@ -89,16 +96,20 @@ def run_mode(mode: str, threshold: float, verbose: bool, agent: DSPyAgent) -> di
         if mode == "guided_learning":
             kwargs["past_attempts"] = getattr(ex, "past_attempts", "none")
 
-        pred = agent.forward(mode, question, **kwargs)
+        # intent_router is not a DSPyAgent mode — call the router directly.
+        if mode == "intent_router":
+            pred = agent._router.forward(user_message=question)
+        else:
+            pred = agent.forward(mode, question, **kwargs)
         ok = bool(metric(ex, pred))
         passed += int(ok)
 
         if verbose:
             status = "PASS" if ok else "FAIL"
-            got = getattr(pred, "citations", "—")
-            exp = getattr(ex, "citations", "—")
+            got = getattr(pred, "citations", getattr(pred, "mode", "—"))
+            exp = getattr(ex, "citations", getattr(ex, "mode", "—"))
             print(f"    {status}  {question[:70]}")
-            print(f"           citations got={got!r}  expected={exp!r}")
+            print(f"           got={got!r}  expected={exp!r}")
 
     total = len(evalset)
     rate = passed / total if total else 0.0

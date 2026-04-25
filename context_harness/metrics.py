@@ -481,3 +481,98 @@ def _tokens(s: str) -> set[str]:
 
 def _contains_spoiler(text: str) -> bool:
     return any(phrase in text for phrase in _SPOILER_PHRASES)
+
+
+# ---------------------------------------------------------------------------
+# Intent Router — mode classification accuracy
+# ---------------------------------------------------------------------------
+
+_ROUTER_VALID_MODES = {
+    "deep_research", "guided_learning", "exam_grader", "open_analysis",
+    "perspective_shift", "debate", "satirical_podcast", "none",
+}
+
+
+def intent_router_metric(example, pred, trace=None) -> bool:
+    """
+    True when:
+      1. Predicted mode matches expected mode (exact, after normalization)
+      2. Required kwargs keys are present (doesn't check values)
+      3. kwargs_json is valid JSON
+    """
+    import json as _json
+
+    expected_mode = (getattr(example, "mode", "") or "").strip().lower()
+    pred_mode = (getattr(pred, "mode", "") or "").strip().lower().replace(" ", "_").replace("-", "_")
+
+    # Mode must match
+    if pred_mode != expected_mode:
+        return False
+
+    # kwargs_json must be valid JSON
+    pred_kwargs_str = (getattr(pred, "kwargs_json", "") or "").strip()
+    try:
+        pred_kwargs = _json.loads(pred_kwargs_str)
+        if not isinstance(pred_kwargs, dict):
+            return False
+    except (ValueError, TypeError):
+        return False
+
+    # Required kwargs keys must be present
+    expected_kwargs_str = (getattr(example, "kwargs_json", "") or "").strip()
+    try:
+        expected_kwargs = _json.loads(expected_kwargs_str)
+        if isinstance(expected_kwargs, dict):
+            for key in expected_kwargs:
+                if key not in pred_kwargs:
+                    return False
+    except (ValueError, TypeError):
+        pass  # no expected kwargs to check
+
+    return True
+
+
+def intent_router_score(example, pred, trace=None) -> float:
+    """
+    Continuous 0.0–1.0 score for ranking.
+
+    Components:
+      0.6 — mode match
+      0.2 — kwargs keys correct
+      0.2 — valid confidence value
+    """
+    import json as _json
+
+    score = 0.0
+
+    expected_mode = (getattr(example, "mode", "") or "").strip().lower()
+    pred_mode = (getattr(pred, "mode", "") or "").strip().lower().replace(" ", "_").replace("-", "_")
+
+    # Mode match (0.6)
+    if pred_mode == expected_mode:
+        score += 0.6
+
+    # kwargs correctness (0.2)
+    pred_kwargs_str = (getattr(pred, "kwargs_json", "") or "").strip()
+    try:
+        pred_kwargs = _json.loads(pred_kwargs_str)
+        if isinstance(pred_kwargs, dict):
+            expected_kwargs_str = (getattr(example, "kwargs_json", "") or "").strip()
+            try:
+                expected_kwargs = _json.loads(expected_kwargs_str)
+                if isinstance(expected_kwargs, dict):
+                    if not expected_kwargs or all(k in pred_kwargs for k in expected_kwargs):
+                        score += 0.2
+                else:
+                    score += 0.2  # no structured kwargs expected
+            except (ValueError, TypeError):
+                score += 0.2  # no expected kwargs to check
+    except (ValueError, TypeError):
+        pass  # invalid JSON — 0 points
+
+    # Valid confidence (0.2)
+    confidence = (getattr(pred, "confidence", "") or "").strip().lower()
+    if confidence in ("low", "medium", "high"):
+        score += 0.2
+
+    return score

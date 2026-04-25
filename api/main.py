@@ -141,7 +141,7 @@ def _record(turn_id: str, name: str, attrs: dict[str, Any] | None = None) -> Non
 
 class AskRequest(BaseModel):
     question: str
-    mode: str = Field(default="deep_research", pattern="^(deep_research|guided_learning|exam_grader|open_analysis|perspective_shift|debate|satirical_podcast)$")
+    mode: str = Field(default="deep_research", pattern="^(deep_research|guided_learning|exam_grader|open_analysis|perspective_shift|debate|satirical_podcast|auto)$")
     character: str = Field(default="Dumbledore", description="HP character for perspective_shift mode")
     collection_name: str = "hp_lore"
     provider: str = "gemini"
@@ -183,6 +183,9 @@ class AskResponse(BaseModel):
     # Useful for gap analysis: aggregated across many turns, non-empty gaps
     # indicate topics the corpus under-covers.
     gaps: str = ""
+    # Intent router metadata — populated when mode="auto"
+    routed_mode: str | None = None
+    router_confidence: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -380,9 +383,19 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
     llm_ms = (time.perf_counter() - t_llm) * 1000
     _record(turn_id, "llm.done", {"latency_ms": llm_ms})
 
-    if req.mode == "deep_research":
+    # When mode="auto", the router resolves the actual mode. Use it for
+    # answer formatting, trace recording, and Langfuse span naming.
+    effective_mode = getattr(pred, "routed_mode", None) or req.mode
+    routed_mode = getattr(pred, "routed_mode", None)
+    router_confidence = getattr(pred, "router_confidence", None)
+
+    # "none" — off-topic. The prediction already has a capability list answer.
+    # Skip retrieval cost tracking; return directly.
+    if effective_mode == "none":
         answer = getattr(pred, "answer", "")
-    elif req.mode == "perspective_shift":
+    elif effective_mode == "deep_research":
+        answer = getattr(pred, "answer", "")
+    elif effective_mode == "perspective_shift":
         response = (getattr(pred, "character_response", "") or "").strip()
         if response:
             answer = response
@@ -391,17 +404,17 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
             insight = getattr(pred, "applied_insight", "")
             reasoning = getattr(pred, "reasoning", "")
             answer = f"**{req.character}'s Principle:** {principle}\n\n**Applied to your situation:** {insight}\n\n**Why this maps:** {reasoning}"
-    elif req.mode == "open_analysis":
+    elif effective_mode == "open_analysis":
         analysis = getattr(pred, "analysis", "")
         corpus_facts = getattr(pred, "corpus_facts", "")
         own_reasoning = getattr(pred, "own_reasoning", "")
         answer = f"{analysis}\n\n**From the corpus:** {corpus_facts}\n\n**My analysis:** {own_reasoning}"
-    elif req.mode == "exam_grader":
+    elif effective_mode == "exam_grader":
         score = getattr(pred, "score", 0)
         is_passing = getattr(pred, "is_passing", False)
         critique = getattr(pred, "critique", "")
         answer = f"**Score:** {score}/100 ({'PASS' if is_passing else 'FAIL'})\n\n**Critique:** {critique}"
-    elif req.mode == "debate":
+    elif effective_mode == "debate":
         args_for = getattr(pred, "arguments_for", "")
         args_against = getattr(pred, "arguments_against", "")
         verdict = getattr(pred, "verdict", "")
@@ -410,7 +423,7 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
             f"**Against:** {args_against}\n\n"
             f"**Verdict:** {verdict}"
         )
-    elif req.mode == "satirical_podcast":
+    elif effective_mode == "satirical_podcast":
         transcript = getattr(pred, "transcript", "")
         tension = getattr(pred, "comedic_tension", "")
         answer = f"{transcript}\n\n*{tension}*" if tension else transcript
@@ -472,8 +485,8 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
                 conversation_id=req.conversation_id,
                 user_message=req.question,
                 agent_response=pred_dict,
-                mode=req.mode,
-                character=(req.character if req.mode == "perspective_shift" else None),
+                mode=effective_mode,
+                character=(req.character if effective_mode == "perspective_shift" else None),
                 tokens_in=tokens_in,
                 tokens_out=tokens_out,
                 cost_usd=cost_usd,
@@ -512,11 +525,12 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
     # any unexpected SDK error so observability never breaks the response.
     try:
         _get_langfuse_client().update_current_span(
-            name=f"ask:{req.mode}",
+            name=f"ask:{effective_mode}",
             input={
                 "question": req.question,
                 "mode": req.mode,
-                "character": req.character if req.mode == "perspective_shift" else None,
+                "effective_mode": effective_mode,
+                "character": req.character if effective_mode == "perspective_shift" else None,
                 "conversation_id": req.conversation_id,
             },
             output={
@@ -541,6 +555,8 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
         cost_usd=cost_usd,
         latency_ms=llm_ms,
         gaps=(getattr(pred, "gaps", "") or ""),
+        routed_mode=routed_mode,
+        router_confidence=router_confidence,
     )
 
 

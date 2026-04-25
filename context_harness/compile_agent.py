@@ -33,6 +33,7 @@ from .metrics import (
     debate_metric,
     satirical_podcast_metric,
     perspective_shift_metric,
+    intent_router_metric,
 )
 
 
@@ -59,6 +60,7 @@ def main() -> int:
     from data.trainset_debate import TRAINSET as debate_trainset
     from data.trainset_satirical_podcast import TRAINSET as podcast_trainset
     from data.trainset_perspective_shift import TRAINSET as pshift_trainset
+    from data.trainset_intent_router import TRAINSET as router_trainset
 
     print("Building ChromaDB-backed pipeline...")
     pipeline = build_pipeline(persist=True)
@@ -66,7 +68,7 @@ def main() -> int:
     agent = DSPyAgent(pipeline)
 
     # ----- Compile deep_research -----
-    print(f"\n[1/5] Compiling deep_research ({len(research_trainset)} examples)...")
+    print(f"\n[1/7] Compiling deep_research ({len(research_trainset)} examples)...")
     research_optimizer = BootstrapFewShot(
         metric=deep_research_metric,
         max_bootstrapped_demos=args.max_demos,
@@ -76,7 +78,7 @@ def main() -> int:
     print("  ✓ deep_research compiled")
 
     # ----- Compile guided_learning -----
-    print(f"\n[2/5] Compiling guided_learning ({len(learning_trainset)} examples)...")
+    print(f"\n[2/7] Compiling guided_learning ({len(learning_trainset)} examples)...")
     learning_optimizer = BootstrapFewShot(
         metric=socratic_metric,
         max_bootstrapped_demos=args.max_demos,
@@ -86,7 +88,7 @@ def main() -> int:
     print("  ✓ guided_learning compiled")
 
     # ----- Compile exam_grader -----
-    print(f"\n[3/5] Compiling exam_grader ({len(grader_trainset)} examples)...")
+    print(f"\n[3/7] Compiling exam_grader ({len(grader_trainset)} examples)...")
     grader_optimizer = BootstrapFewShot(
         metric=exam_grader_metric,
         max_bootstrapped_demos=args.max_demos,
@@ -96,7 +98,7 @@ def main() -> int:
     print("  ✓ exam_grader compiled")
 
     # ----- Compile debate -----
-    print(f"\n[4/5] Compiling debate ({len(debate_trainset)} examples)...")
+    print(f"\n[4/7] Compiling debate ({len(debate_trainset)} examples)...")
     debate_optimizer = BootstrapFewShot(
         metric=debate_metric,
         max_bootstrapped_demos=args.max_demos,
@@ -106,7 +108,7 @@ def main() -> int:
     print("  ✓ debate compiled")
 
     # ----- Compile satirical_podcast -----
-    print(f"\n[5/6] Compiling satirical_podcast ({len(podcast_trainset)} examples)...")
+    print(f"\n[5/7] Compiling satirical_podcast ({len(podcast_trainset)} examples)...")
     podcast_optimizer = BootstrapFewShot(
         metric=satirical_podcast_metric,
         max_bootstrapped_demos=args.max_demos,
@@ -121,7 +123,7 @@ def main() -> int:
     # substance + citations + NO greeting opener when chat_history is
     # non-empty. Together this produces demos that teach authentic voice
     # + continuation discipline on turn 2+.
-    print(f"\n[6/6] Compiling perspective_shift ({len(pshift_trainset)} examples)...")
+    print(f"\n[6/7] Compiling perspective_shift ({len(pshift_trainset)} examples)...")
     pshift_optimizer = BootstrapFewShot(
         metric=perspective_shift_metric,
         max_bootstrapped_demos=args.max_demos,
@@ -129,6 +131,16 @@ def main() -> int:
     )
     agent.compile_perspective_shift(pshift_optimizer, trainset=pshift_trainset)
     print("  ✓ perspective_shift compiled")
+
+    # ----- Compile intent_router -----
+    print(f"\n[7/7] Compiling intent_router ({len(router_trainset)} examples)...")
+    router_optimizer = BootstrapFewShot(
+        metric=intent_router_metric,
+        max_bootstrapped_demos=args.max_demos,
+        max_labeled_demos=args.max_labeled,
+    )
+    agent.compile_intent_router(router_optimizer, trainset=router_trainset)
+    print("  ✓ intent_router compiled")
 
     # ----- Save -----
     print(f"\nSaving compiled agent to {args.out}/ ...")
@@ -139,6 +151,7 @@ def main() -> int:
     print("  ✓ debate.json")
     print("  ✓ satirical_podcast.json")
     print("  ✓ perspective_shift.json")
+    print("  ✓ intent_router.json")
     print("  ✓ manifest.json")
     print("\nDone.")
     return 0

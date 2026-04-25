@@ -49,6 +49,7 @@ from typing import Any, Dict, Optional
 
 import dspy
 
+from .intent_router import IntentRouterModule, parse_router_output
 from .rag_pipeline import RAGPipeline
 
 
@@ -563,6 +564,7 @@ class DSPyAgent:
             "debate":            DebateModule(pipeline, k=7),
             "satirical_podcast": SatiricalPodcastModule(pipeline, k=6),
         }
+        self._router = IntentRouterModule()
         if export_dir:
             self._load(Path(export_dir))
 
@@ -570,15 +572,35 @@ class DSPyAgent:
     # Inference
     # ------------------------------------------------------------------
 
+    # Capability list returned when the router classifies a message as "none"
+    _CAPABILITY_TEXT = (
+        "I'm a Harry Potter lore agent! Here's what I can do:\n\n"
+        "- **Ask a question** — factual HP lore lookup (deep_research)\n"
+        "- **Learn interactively** — Socratic tutoring on HP topics (guided_learning)\n"
+        "- **Get graded** — submit an answer for canon-based grading (exam_grader)\n"
+        "- **Analyze** — deep analysis blending canon with broader knowledge (open_analysis)\n"
+        "- **Character advice** — get advice from an HP character's perspective (perspective_shift)\n"
+        "- **Debate** — argue both sides of a HP lore debate (debate)\n"
+        "- **Comedy** — satirical podcast on HP topics through a modern lens (satirical_podcast)\n\n"
+        "Try asking something about the Harry Potter universe!"
+    )
+
     def forward(self, mode: str, text: str = "", **kwargs) -> dspy.Prediction:
         """
         Route a query to the correct mode.
+
+        When ``mode="auto"``, the intent router classifies the user's message
+        and dispatches to the resolved mode. The returned prediction carries
+        ``routed_mode`` and ``router_confidence`` attributes.
 
         `text` maps to the Signature's **primary** input field (the first
         non-`context` input) via introspection. Secondary inputs — e.g.
         `character`, `student_answer`, `past_attempts`, `modern_angle` — must
         be passed as explicit kwargs.
         """
+        if mode == "auto":
+            return self._route_auto(text, **kwargs)
+
         if mode not in MODES:
             raise ValueError(f"Unknown mode {mode!r}. Valid modes: {sorted(MODES)}")
         module = self._modules[mode]
@@ -586,6 +608,26 @@ class DSPyAgent:
         if text and primary not in kwargs:
             kwargs[primary] = text
         return module.forward(**kwargs)
+
+    def _route_auto(self, text: str, **kwargs) -> dspy.Prediction:
+        """Classify intent via the router, then dispatch to the resolved mode."""
+        router_pred = self._router.forward(user_message=text)
+        result = parse_router_output(router_pred)
+
+        if result["mode"] == "none":
+            pred = dspy.Prediction(answer=self._CAPABILITY_TEXT)
+            pred.routed_mode = "none"
+            pred.router_confidence = result["confidence"]
+            return pred
+
+        # Merge: router-extracted kwargs are defaults; caller kwargs override
+        merged_kwargs = {**result["kwargs"], **kwargs}
+        resolved_mode = result["mode"]
+
+        pred = self.forward(resolved_mode, text, **merged_kwargs)
+        pred.routed_mode = resolved_mode
+        pred.router_confidence = result["confidence"]
+        return pred
 
     # ------------------------------------------------------------------
     # Export / import
@@ -598,6 +640,8 @@ class DSPyAgent:
 
         for mode, module in self._modules.items():
             module.save(str(path / f"{mode}.json"))
+
+        self._router.save(str(path / "intent_router.json"))
 
         _write_manifest(path, embedding_model=self._pipeline.embedding_model_name)
 
@@ -612,6 +656,10 @@ class DSPyAgent:
             artifact = path / f"{mode}.json"
             if artifact.exists():
                 module.load(str(artifact))
+
+        router_artifact = path / "intent_router.json"
+        if router_artifact.exists():
+            self._router.load(str(router_artifact))
 
     # ------------------------------------------------------------------
     # Optimiser helpers (called during training, not inference)
@@ -657,6 +705,12 @@ class DSPyAgent:
         """
         self._modules["perspective_shift"] = optimizer.compile(
             self._modules["perspective_shift"], trainset=trainset
+        )
+
+    def compile_intent_router(self, optimizer: dspy.teleprompt.Teleprompter, trainset: list) -> None:
+        """Run the optimizer on the intent router module and update in place."""
+        self._router = optimizer.compile(
+            self._router, trainset=trainset
         )
 
 
