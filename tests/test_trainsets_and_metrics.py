@@ -558,3 +558,116 @@ def test_perspective_shift_reflection_multi_turn_real_length():
     )
     assert perspective_shift_metric(example, reflecting_pred) is True, \
         "Reflecting response should pass — echoes user's content words"
+
+
+# ---------------------------------------------------------------------------
+# Sorting Hat — commit guard + trainset integrity
+# ---------------------------------------------------------------------------
+
+def test_sorting_hat_trainset_has_enough_examples():
+    from data.trainset_perspective_shift import TRAINSET
+    hat_examples = [
+        ex for ex in TRAINSET
+        if (getattr(ex, "character", "") or "").lower().replace(" ", "-") == "sorting-hat"
+    ]
+    assert len(hat_examples) >= 3, "Need at least 3 Sorting Hat TRAINSET examples"
+
+
+def test_sorting_hat_metric_passes_turn1_no_house():
+    """Turn 1 (no prior User: turns) — Hat is asking, no house needed."""
+    example = SimpleNamespace(
+        scenario="Sort me into a Hogwarts house",
+        character="sorting-hat",
+        chat_history="",
+    )
+    pred = _good_pshift_pred(
+        character_response=(
+            "Ahh, another mind to peer inside. Let me see what qualities "
+            "burn brightest here. Tell me — when faced with a locked door, "
+            "what is your first instinct? Something tells me you would not "
+            "simply walk away."
+        ),
+    )
+    assert perspective_shift_metric(example, pred) is True
+
+
+def test_sorting_hat_metric_passes_turn2_no_house():
+    """Turn 2 (1 prior User: turn) — Hat still asking, no house needed."""
+    example = SimpleNamespace(
+        scenario="Try to figure out the mechanism",
+        character="sorting-hat",
+        chat_history="[1] User: Sort me into a Hogwarts house\n     Sorting Hat: Ahh...",
+    )
+    pred = _good_pshift_pred(
+        character_response=(
+            "A puzzle-solver, are you? Rowena Ravenclaw would approve. But "
+            "knowing how something works is not the same as knowing what to "
+            "do with that knowledge. Tell me — when a friend makes a terrible "
+            "mistake, what matters more to you?"
+        ),
+    )
+    assert perspective_shift_metric(example, pred) is True
+
+
+def test_sorting_hat_metric_passes_turn3_with_house():
+    """Turn 3 (≥2 prior User: turns) — Hat MUST commit. Response with house passes."""
+    example = SimpleNamespace(
+        scenario="Standing by them no matter what",
+        character="sorting-hat",
+        chat_history=(
+            "[1] User: Sort me into a Hogwarts house\n"
+            "     Sorting Hat: Ahh...\n"
+            "[2] User: Try to figure out the mechanism\n"
+            "     Sorting Hat: A puzzle-solver..."
+        ),
+    )
+    pred = _good_pshift_pred(
+        character_response=(
+            "Loyalty above cleverness, devotion above glory. Helga Hufflepuff "
+            "cherished exactly that quality. Better be... HUFFLEPUFF!"
+        ),
+    )
+    assert perspective_shift_metric(example, pred) is True
+
+
+def test_sorting_hat_metric_fails_turn3_without_house():
+    """Turn 3 (≥2 prior User: turns) — Hat MUST commit. Response without house fails."""
+    example = SimpleNamespace(
+        scenario="Standing by them no matter what",
+        character="sorting-hat",
+        chat_history=(
+            "[1] User: Sort me into a Hogwarts house\n"
+            "     Sorting Hat: Ahh...\n"
+            "[2] User: Try to figure out the mechanism\n"
+            "     Sorting Hat: A puzzle-solver..."
+        ),
+    )
+    pred = _good_pshift_pred(
+        character_response=(
+            "Interesting, very interesting. Let me think about that some "
+            "more. You have many qualities that could lead you in different "
+            "directions. Tell me one more thing before I decide."
+        ),
+    )
+    assert perspective_shift_metric(example, pred) is False
+
+
+def test_sorting_hat_metric_does_not_fire_for_other_characters():
+    """The commit guard only applies to sorting-hat, not other characters."""
+    example = SimpleNamespace(
+        scenario="I'm tired",
+        character="albus-dumbledore",
+        chat_history=(
+            "[1] User: Help me decide.\n     Tutor: ...\n"
+            "[2] User: I still can't.\n     Tutor: ..."
+        ),
+    )
+    pred = _good_pshift_pred(
+        character_response=(
+            "Tired. Yes. Let us try something I have found useful. Imagine "
+            "yourself one year from now having chosen each path. Notice what "
+            "you feel — not what you think."
+        ),
+    )
+    # No house name needed for Dumbledore even on turn 3
+    assert perspective_shift_metric(example, pred) is True

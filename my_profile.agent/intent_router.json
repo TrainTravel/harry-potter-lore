@@ -1,0 +1,155 @@
+{
+  "predict.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "user_message": "What does the Mirror of Erised say about human psychology?",
+        "mode": "open_analysis",
+        "kwargs_json": "{}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "Solve this equation: 2x + 3 = 7",
+        "mode": "none",
+        "kwargs_json": "{}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "Check my answer: The question was about who created Horcruxes. My answer: Voldemort invented Horcruxes to become immortal.",
+        "mode": "exam_grader",
+        "kwargs_json": "{\"student_answer\": \"Voldemort invented Horcruxes to become immortal.\"}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "Mark this answer: Q: Name three Unforgivable Curses. A: Avada Kedavra, Crucio, and Expelliarmus.",
+        "mode": "exam_grader",
+        "kwargs_json": "{\"student_answer\": \"Avada Kedavra, Crucio, and Expelliarmus.\"}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "Quiz me on the Deathly Hallows",
+        "mode": "guided_learning",
+        "kwargs_json": "{}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "Compare the leadership styles of Dumbledore and Voldemort",
+        "mode": "open_analysis",
+        "kwargs_json": "{}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "Make a funny podcast about house elves and gig economy labor",
+        "mode": "satirical_podcast",
+        "kwargs_json": "{\"modern_angle\": \"gig economy labor\"}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "Argue both sides: were the Deathly Hallows more dangerous than Horcruxes?",
+        "mode": "debate",
+        "kwargs_json": "{}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "How does the Marauder's Map work?",
+        "mode": "deep_research",
+        "kwargs_json": "{}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "Was Snape really a hero?",
+        "mode": "debate",
+        "kwargs_json": "{}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "Help me understand how Horcruxes work",
+        "mode": "guided_learning",
+        "kwargs_json": "{}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "Do a podcast about Quidditch as an extreme sport industry",
+        "mode": "satirical_podcast",
+        "kwargs_json": "{\"modern_angle\": \"extreme sport industry\"}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "What do you think about Dumbledore?",
+        "mode": "open_analysis",
+        "kwargs_json": "{}",
+        "confidence": "medium"
+      },
+      {
+        "user_message": "Tell me about Snape",
+        "mode": "deep_research",
+        "kwargs_json": "{}",
+        "confidence": "medium"
+      },
+      {
+        "user_message": "Tell me about the Lord of the Rings",
+        "mode": "none",
+        "kwargs_json": "{}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "I'm going through a hard time. What would Luna say?",
+        "mode": "perspective_shift",
+        "kwargs_json": "{\"character\": \"Luna\"}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "What are the properties of the Elder Wand?",
+        "mode": "deep_research",
+        "kwargs_json": "{}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "Is Hogwarts an effective educational institution by modern standards?",
+        "mode": "open_analysis",
+        "kwargs_json": "{}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "How would Hermione handle imposter syndrome at a new job?",
+        "mode": "perspective_shift",
+        "kwargs_json": "{\"character\": \"Hermione\"}",
+        "confidence": "high"
+      }
+    ],
+    "signature": {
+      "instructions": "Classify a user's message into the best-matching Harry Potter agent mode\nand extract any parameters the mode needs.\n\nAvailable modes:\n\ndeep_research — broad factual questions about HP lore, history, spells,\n    creatures, events. Example: \"What are the properties of the Elder Wand?\"\n\nguided_learning — Socratic tutoring. The user wants to learn, not just get\n    an answer. Example: \"Help me understand how Horcruxes work.\"\n\nexam_grader — the user provides a student answer to be graded against canon.\n    Extract the exam question and student_answer into kwargs_json.\n    Example: \"Grade this answer: Q: What are the Deathly Hallows? A: Three\n    powerful objects created by Death.\"\n\nopen_analysis — analytical, interpretive, or comparative questions that go\n    beyond factual retrieval. Example: \"Why did Snape become the person he\n    became?\"\n\nperspective_shift — the user wants advice from an HP character's perspective,\n    or wants to be sorted, counselled, or spoken to as/by a character.\n    Extract the character name into kwargs_json. Example: \"What would\n    Dumbledore say about my career change?\"\n\ndebate — the user states a debatable claim about HP canon and wants both\n    sides argued. Example: \"Was Snape really a hero?\"\n\nsatirical_podcast — the user wants a comedic take on an HP topic through a\n    modern lens. Extract the modern_angle into kwargs_json if stated.\n    Example: \"Do a podcast about Quidditch as an extreme sport industry.\"\n\nnone — the message is off-topic (weather, math, non-HP fiction, greetings\n    with no HP content). Return mode=\"none\".\n\nRules:\n- Choose exactly ONE mode.\n- For perspective_shift: extract character into kwargs_json. If the user\n  says \"sort me\" or \"put me into a house\", use character=\"Sorting Hat\".\n- For exam_grader: extract student_answer into kwargs_json.\n- For satirical_podcast: extract modern_angle into kwargs_json if stated.\n- kwargs_json must be valid JSON or an empty object \"{}\".\n- confidence: \"high\" when the intent is unambiguous, \"medium\" when 2 modes\n  could apply, \"low\" when guessing.",
+      "fields": [
+        {
+          "prefix": "User Message:",
+          "description": "the user's raw message to classify"
+        },
+        {
+          "prefix": "Reasoning: Let's think step by step in order to",
+          "description": "${reasoning}"
+        },
+        {
+          "prefix": "Mode:",
+          "description": "one of: deep_research, guided_learning, exam_grader, open_analysis, perspective_shift, debate, satirical_podcast, none"
+        },
+        {
+          "prefix": "Kwargs Json:",
+          "description": "JSON object with extracted parameters for the chosen mode, e.g. {\"character\": \"Dumbledore\"} or \"{}\" if none needed"
+        },
+        {
+          "prefix": "Confidence:",
+          "description": "one of: low, medium, high"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.12",
+      "dspy": "3.1.3",
+      "cloudpickle": "3.1"
+    }
+  }
+}

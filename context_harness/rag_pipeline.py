@@ -229,6 +229,13 @@ class RAGPipeline:
     pipeline degrades gracefully to an in-memory list (useful for unit tests).
     """
 
+    def __deepcopy__(self, memo):
+        # ChromaDB clients hold unpicklable threads/sockets/sqlite handles, so
+        # genuine deepcopy fails. DSPy's BootstrapFewShot deepcopies modules
+        # at compile time but only ever calls retrieve() on the pipeline —
+        # read-only — so a shared reference is safe.
+        return self
+
     def __init__(
         self,
         collection_name: str = "hp_lore",

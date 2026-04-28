@@ -95,7 +95,7 @@ from context_harness.conversation import (
     DEFAULT_KEEP_RECENT,
 )
 from context_harness.cost_tracker import estimate_cost_usd
-from context_harness.dspy_agent import DSPyAgent
+from context_harness.dspy_agent import DSPyAgent, _normalize_character
 from context_harness.ingest_lore import build_pipeline
 from context_harness.security import PromptGuard, InputValidator, OutputFilter
 
@@ -186,6 +186,10 @@ class AskResponse(BaseModel):
     # Intent router metadata — populated when mode="auto"
     routed_mode: str | None = None
     router_confidence: str | None = None
+    # Interactive options — when present, UI renders as clickable chips
+    # below the message. User clicking an option sends it as the next
+    # question text. Used by Sorting Hat quiz, potentially other modes.
+    options: list[str] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -295,6 +299,46 @@ def ingest(req: IngestRequest) -> IngestResponse:
     )
 
 
+import re as _re
+
+_SORTING_HOUSES = {"gryffindor", "hufflepuff", "ravenclaw", "slytherin"}
+
+# Hat commits via canonical phrasing ("Better be...") or shouts the house in
+# ALL CAPS. Mid-sentence lowercase mentions ("the loyalty of Hufflepuff") are
+# the Hat *describing* a house, not committing — those must NOT count.
+_HAT_COMMIT_PATTERN = _re.compile(
+    r"\bbetter be\b|\b(?:GRYFFINDOR|HUFFLEPUFF|RAVENCLAW|SLYTHERIN)\b"
+)
+
+
+def _hat_committed(answer: str) -> bool:
+    return bool(_HAT_COMMIT_PATTERN.search(answer))
+
+
+def _extract_sorting_options(text: str) -> list[str] | None:
+    """Extract quiz options from Sorting Hat response text.
+
+    Looks for numbered/bulleted items. If none found, returns 4 generic
+    trait-based defaults so the UI always has clickable chips while the
+    Hat is still asking questions.
+    """
+    # Try numbered/lettered list: "1. ...", "a) ...", "- ..."
+    items = _re.findall(
+        r"(?:^|\n)\s*(?:\d+[.)]\s*|[a-d][.)]\s*|[-•]\s*)(.+)",
+        text,
+        _re.IGNORECASE,
+    )
+    if len(items) >= 3:
+        return [item.strip()[:80] for item in items[:4]]
+    # Fallback: generic trait options
+    return [
+        "Face it head-on with courage",
+        "Work through it patiently with loyalty",
+        "Analyse it carefully before acting",
+        "Find the smartest path to my goal",
+    ]
+
+
 @app.post("/ask", response_model=AskResponse)
 @observe(name="ask")
 def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
@@ -391,6 +435,7 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
 
     # "none" — off-topic. The prediction already has a capability list answer.
     # Skip retrieval cost tracking; return directly.
+    options = None  # populated only for Sorting Hat quiz turns
     if effective_mode == "none":
         answer = getattr(pred, "answer", "")
     elif effective_mode == "deep_research":
@@ -404,6 +449,13 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
             insight = getattr(pred, "applied_insight", "")
             reasoning = getattr(pred, "reasoning", "")
             answer = f"**{req.character}'s Principle:** {principle}\n\n**Applied to your situation:** {insight}\n\n**Why this maps:** {reasoning}"
+
+        # Sorting Hat: provide clickable options while the Hat is still asking
+        options = None
+        slug = _normalize_character(req.character)
+        if slug in ("sorting-hat", "the-sorting-hat"):
+            if not _hat_committed(answer):
+                options = _extract_sorting_options(answer)
     elif effective_mode == "open_analysis":
         analysis = getattr(pred, "analysis", "")
         corpus_facts = getattr(pred, "corpus_facts", "")
@@ -557,6 +609,7 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
         gaps=(getattr(pred, "gaps", "") or ""),
         routed_mode=routed_mode,
         router_confidence=router_confidence,
+        options=options,
     )
 
 
