@@ -2,7 +2,7 @@
 DSPy EVALSET SLO check
 ======================
 Runs the programmatic metrics (deep_research_metric, socratic_metric,
-debate_metric) against each mode's held-out EVALSET and exits non-zero
+debate_metric, satirical_podcast_metric) against each mode's held-out EVALSET and exits non-zero
 if the pass rate falls below the SLO threshold.
 
 Designed to run in CI on every PR (cheap: 5 real LLM calls per mode).
@@ -34,6 +34,7 @@ from context_harness.metrics import (
     socratic_metric,
     debate_metric,
     intent_router_metric,
+    satirical_podcast_metric,
 )
 
 # ---------------------------------------------------------------------------
@@ -65,6 +66,12 @@ MODE_CONFIG = {
         "input_field": "user_message",
         "default_slo": 0.80,
     },
+    "satirical_podcast": {
+        "trainset_module": "data.trainset_satirical_podcast",
+        "metric": satirical_podcast_metric,
+        "input_field": "topic",
+        "default_slo": 0.60,
+    },
 }
 
 
@@ -95,6 +102,8 @@ def run_mode(mode: str, threshold: float, verbose: bool, agent: DSPyAgent) -> di
         kwargs = {}
         if mode == "guided_learning":
             kwargs["past_attempts"] = getattr(ex, "past_attempts", "none")
+        elif mode == "satirical_podcast":
+            kwargs["modern_angle"] = getattr(ex, "modern_angle", "")
 
         # intent_router is not a DSPyAgent mode — call the router directly.
         if mode == "intent_router":
