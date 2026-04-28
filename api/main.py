@@ -394,40 +394,93 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
     lm = dspy.LM(model_name, api_key=api_key)
 
     t_llm = time.perf_counter()
-    kwargs = {}
-    if req.mode == "exam_grader":
-        kwargs["student_answer"] = req.student_answer
-    elif req.mode == "perspective_shift":
-        kwargs["character"] = req.character
-    elif req.mode == "satirical_podcast":
-        kwargs["modern_angle"] = req.modern_angle
-
-    # Multi-turn: for eligible modes, load prior turns and inject as text.
-    # Ignored (silently) for one-shot modes — no need for the client to care.
-    # Compaction runs AFTER the response via BackgroundTasks so it never
-    # blocks the user-facing turn latency.
     conv_store: ConversationStore | None = None
-    if req.conversation_id and req.mode in _CHAT_MODES:
-        conv_store = _get_conversation_store()
-        history = conv_store.load_history(req.conversation_id, max_turns=DEFAULT_KEEP_RECENT)
-        kwargs["chat_history"] = conv_store.format_for_llm(history, mode=req.mode)
-        _record(turn_id, "chat_history.loaded", {
-            "conversation_id": req.conversation_id,
-            "prior_turns": len(history.turns),
-            "has_summary": bool(history.summary),
-            "history_chars": len(kwargs["chat_history"]),
+
+    # --- Resolve dispatch mode (with stickiness for mode=auto) ---
+    # When mode="auto", the router votes; stickiness arbitrates against the
+    # prior turn (if any) so ambiguous follow-ups like "cool" don't collapse
+    # the conversation to off-topic. See SPEC.md §Design.
+    dispatch_mode: str | None = req.mode
+    dispatch_character = req.character
+    routed_mode: str | None = None
+    router_confidence: str | None = None
+    decision_source = "client"
+    prior_mode: str | None = None
+    prior_character: str | None = None
+
+    if req.mode == "auto":
+        if req.conversation_id:
+            _store_for_prior = _get_conversation_store()
+            _prior_history = _store_for_prior.load_history(
+                req.conversation_id, max_turns=1,
+            )
+            if _prior_history.turns:
+                prior_mode = _prior_history.turns[-1].mode
+                prior_character = _prior_history.turns[-1].character
+
+        with dspy.context(lm=lm):
+            router_result = agent.route_only(req.question)
+        routed_mode = router_result["mode"]
+        router_confidence = router_result["confidence"]
+
+        dispatch_mode, decision_source = _decide_effective_mode(
+            routed_mode=routed_mode,
+            router_confidence=router_confidence,
+            prior_mode=prior_mode,
+        )
+        _record(turn_id, "router.decision", {
+            "prior_mode": prior_mode,
+            "routed_mode": routed_mode,
+            "confidence": router_confidence,
+            "effective_mode": dispatch_mode,
+            "source": decision_source,
         })
 
-    with dspy.context(lm=lm):
-        pred = agent.forward(req.mode, req.question, **kwargs)
-    llm_ms = (time.perf_counter() - t_llm) * 1000
-    _record(turn_id, "llm.done", {"latency_ms": llm_ms})
+        # Inherit prior character on sticky perspective_shift continuation,
+        # but only when the client sent the default (Dumbledore). Explicit
+        # non-default picks are always respected.
+        if (dispatch_mode == "perspective_shift"
+                and prior_character
+                and dispatch_character == "Dumbledore"
+                and prior_character != "Dumbledore"):
+            dispatch_character = prior_character
 
-    # When mode="auto", the router resolves the actual mode. Use it for
-    # answer formatting, trace recording, and Langfuse span naming.
-    effective_mode = getattr(pred, "routed_mode", None) or req.mode
-    routed_mode = getattr(pred, "routed_mode", None)
-    router_confidence = getattr(pred, "router_confidence", None)
+    # Off-topic short-circuit: skip mode dispatch, return capability text.
+    if dispatch_mode == "none" or dispatch_mode is None:
+        pred = dspy.Prediction(answer=agent._CAPABILITY_TEXT)
+        effective_mode = "none"
+        llm_ms = (time.perf_counter() - t_llm) * 1000
+        _record(turn_id, "llm.done", {"latency_ms": llm_ms, "off_topic": True})
+    else:
+        kwargs = {}
+        if dispatch_mode == "exam_grader":
+            kwargs["student_answer"] = req.student_answer
+        elif dispatch_mode == "perspective_shift":
+            kwargs["character"] = dispatch_character
+        elif dispatch_mode == "satirical_podcast":
+            kwargs["modern_angle"] = req.modern_angle
+
+        # Multi-turn: for eligible modes, load prior turns and inject as text.
+        # Ignored (silently) for one-shot modes — no need for the client to care.
+        # Compaction runs AFTER the response via BackgroundTasks so it never
+        # blocks the user-facing turn latency.
+        if req.conversation_id and dispatch_mode in _CHAT_MODES:
+            conv_store = _get_conversation_store()
+            history = conv_store.load_history(req.conversation_id, max_turns=DEFAULT_KEEP_RECENT)
+            kwargs["chat_history"] = conv_store.format_for_llm(history, mode=dispatch_mode)
+            _record(turn_id, "chat_history.loaded", {
+                "conversation_id": req.conversation_id,
+                "prior_turns": len(history.turns),
+                "has_summary": bool(history.summary),
+                "history_chars": len(kwargs["chat_history"]),
+            })
+
+        with dspy.context(lm=lm):
+            pred = agent.forward(dispatch_mode, req.question, **kwargs)
+        llm_ms = (time.perf_counter() - t_llm) * 1000
+        _record(turn_id, "llm.done", {"latency_ms": llm_ms})
+
+        effective_mode = dispatch_mode
 
     # "none" — off-topic. The prediction already has a capability list answer.
     # Skip retrieval cost tracking; return directly.
@@ -443,7 +496,7 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
             principle = getattr(pred, "character_principle", "")
             insight = getattr(pred, "applied_insight", "")
             reasoning = getattr(pred, "reasoning", "")
-            answer = f"**{req.character}'s Principle:** {principle}\n\n**Applied to your situation:** {insight}\n\n**Why this maps:** {reasoning}"
+            answer = f"**{dispatch_character}'s Principle:** {principle}\n\n**Applied to your situation:** {insight}\n\n**Why this maps:** {reasoning}"
     elif effective_mode == "open_analysis":
         analysis = getattr(pred, "analysis", "")
         corpus_facts = getattr(pred, "corpus_facts", "")
@@ -526,7 +579,7 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
                 user_message=req.question,
                 agent_response=pred_dict,
                 mode=effective_mode,
-                character=(req.character if effective_mode == "perspective_shift" else None),
+                character=(dispatch_character if effective_mode == "perspective_shift" else None),
                 tokens_in=tokens_in,
                 tokens_out=tokens_out,
                 cost_usd=cost_usd,
