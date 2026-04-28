@@ -102,6 +102,46 @@ from context_harness.security import PromptGuard, InputValidator, OutputFilter
 # Modes that participate in multi-turn conversation (Phase 0).
 # Others remain one-shot; client can send `conversation_id` but it's ignored.
 _CHAT_MODES = {"open_analysis", "guided_learning", "perspective_shift"}
+
+
+def _decide_effective_mode(
+    routed_mode: str | None,
+    router_confidence: str | None,
+    prior_mode: str | None,
+) -> tuple[str | None, str]:
+    """Pick the effective mode for a turn given router output + prior turn.
+
+    Pure function — no IO, no globals. Three inputs, two outputs:
+        Returns: (effective_mode, source)
+        source ∈ {"router", "sticky", "router-override"}
+
+    Rules (see SPEC.md §Acceptance + tasks/plan.md):
+      1. No prior_mode → trust the router (turn 1 / no conversation_id)
+      2. prior_mode == "none" → router gets a fresh vote (user re-engaging)
+      3. routed_mode == prior_mode → router agrees, no change
+      4. high-confidence different non-"none" mode → honor switch
+      5. otherwise (low/medium confidence or "none" classification) → stick
+    """
+    # Rule 1: no prior turn — trust router unconditionally
+    if prior_mode is None:
+        return routed_mode, "router"
+
+    # Rule 2: prior was off-topic — fresh router vote (don't stick on "none")
+    if prior_mode == "none":
+        return routed_mode, "router"
+
+    # Rule 3: router agrees with prior — no-op
+    if routed_mode == prior_mode:
+        return prior_mode, "router"
+
+    # Rule 4: high-confidence override (must be a real, non-"none" mode)
+    if (router_confidence == "high"
+            and routed_mode is not None
+            and routed_mode != "none"):
+        return routed_mode, "router-override"
+
+    # Rule 5: stickiness wins — keep prior_mode
+    return prior_mode, "sticky"
 _conversation_store: ConversationStore | None = None
 
 
