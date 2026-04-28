@@ -609,6 +609,18 @@ class DSPyAgent:
             kwargs[primary] = text
         return module.forward(**kwargs)
 
+    def route_only(self, text: str) -> Dict[str, Any]:
+        """Run the intent router *without* dispatching to a mode module.
+
+        Returns ``{"mode": str, "confidence": str, "kwargs": dict}`` — the
+        same shape ``_route_auto`` consumes internally. Used by the API layer
+        to inject stickiness/policy between routing and dispatch (see
+        SPEC.md §Design): caller decides the effective mode, then calls
+        ``forward(effective_mode, ...)`` to dispatch.
+        """
+        router_pred = self._router.forward(user_message=text)
+        return parse_router_output(router_pred)
+
     def _route_auto(self, text: str, **kwargs) -> dspy.Prediction:
         """Classify intent via the router, then dispatch to the resolved mode."""
         router_pred = self._router.forward(user_message=text)

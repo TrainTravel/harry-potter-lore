@@ -345,6 +345,57 @@ def test_agent_modes_constant():
     assert "satirical_podcast" in MODES
 
 
+def test_agent_route_only_returns_dict_with_required_keys(pipeline):
+    """``agent.route_only(text)`` runs only the intent router and returns
+    the parsed output dict. No dispatch to a mode module — caller decides
+    what to do with the result. Used by /ask to inject stickiness between
+    routing and dispatch (SPEC.md §Design)."""
+    # Override DummyLM with router-shaped output for this test
+    lm = DummyLM(answers=[{
+        "mode": "deep_research",
+        "kwargs_json": "{}",
+        "confidence": "high",
+        "reasoning": "Classified as factual lore lookup.",
+    }])
+    dspy.configure(lm=lm)
+
+    agent = DSPyAgent(pipeline)
+    result = agent.route_only("Who killed Dumbledore?")
+
+    assert isinstance(result, dict)
+    assert set(result.keys()) >= {"mode", "confidence", "kwargs"}
+    assert result["mode"] == "deep_research"
+    assert result["confidence"] == "high"
+    assert isinstance(result["kwargs"], dict)
+
+
+def test_agent_route_only_does_not_dispatch_to_mode_module(pipeline, monkeypatch):
+    """``route_only`` must NOT call any mode module's forward() — it's
+    router-only. We assert by patching every mode module's forward to raise;
+    ``route_only`` should still succeed."""
+    lm = DummyLM(answers=[{
+        "mode": "deep_research",
+        "kwargs_json": "{}",
+        "confidence": "high",
+        "reasoning": "test",
+    }])
+    dspy.configure(lm=lm)
+
+    agent = DSPyAgent(pipeline)
+
+    # Sabotage every mode module's forward — if route_only dispatches, this
+    # test fails loudly.
+    def _boom(*_args, **_kwargs):
+        raise AssertionError("route_only must not dispatch to a mode module")
+
+    for module in agent._modules.values():
+        monkeypatch.setattr(module, "forward", _boom)
+
+    # Should still return a result without invoking any module
+    result = agent.route_only("anything")
+    assert result["mode"] == "deep_research"
+
+
 # ---------------------------------------------------------------------------
 # DSPyAgent — save / load round-trip
 # ---------------------------------------------------------------------------
