@@ -184,11 +184,43 @@ hides which caller is broken.
 
 - [ ] Signature defined (names input fields)
 - [ ] Module: `forward()` params match Signature input fields verbatim
-- [ ] Trainset: `.with_inputs(...)` uses identical strings
-- [ ] Metric function added to `context_harness/metrics.py`
+- [ ] Trainset: `.with_inputs(...)` uses identical strings (5–10 hand-labeled
+      gold examples to start; full output fields populated)
+- [ ] Metric function added to `context_harness/metrics.py` — write the
+      *strictest* check you can defend (the metric is your filter against bad
+      teacher demos at compile time)
+- [ ] **Sanity-check the teacher BEFORE recompiling** —
+      `python -m scripts.sanity_check_teacher --mode <name> --idx 0` runs the
+      uncompiled module on one example. Compare the teacher's output to your
+      gold `character_response`. If the teacher is meaningfully weaker, skip
+      bootstrap: recompile with `--max-demos 0 --max-labeled <N>`. Otherwise
+      defaults are fine.
 - [ ] `MODE_CONFIG` entry in `evals/slo_check.py`
 - [ ] Compile smoke test in `tests/test_compile_smoke.py` (asserts the mode
       survives `BootstrapFewShot.compile(...)` under `DummyLM`)
+- [ ] After recompile, inspect demos in `my_profile.agent/<mode>.json` —
+      verify they match your gold pattern, not the teacher's rambling
+
+### Bootstrap vs labeled (2026-04-28)
+
+`BootstrapFewShot` populates the compiled prompt with two demo types:
+1. **Bootstrapped** — teacher LLM generates a fresh response per trainset
+   input; if metric passes, that response becomes the demo
+2. **Labeled** — your hand-written `character_response` (or other output
+   fields) pasted into the demo verbatim
+
+Use bootstrap when the teacher LLM is meaningfully smarter than your runtime
+LLM (e.g., compile with Gemini-Pro / Claude, run on Flash-Lite). The teacher
+generates diverse demos beyond what you'd write by hand.
+
+Use labeled-only (`--max-demos 0 --max-labeled <N>`) when the teacher is
+weaker than or comparable to your gold demos. This shipped the Sorting Hat
+turn-3 commit (2026-04-28): flash-lite teacher couldn't reproduce
+"Better be... HUFFLEPUFF!", it generated verbose explanations that mentioned
+house names mid-sentence; the lax metric ("contains a house name") let those
+through; verbose teacher demos drowned out the one labeled gold demo per
+recompile. Labeled-only routes all hand-written gold into the prompt, runtime
+imitates the canonical pattern.
 
 ### Known gap (as of 2026-04-17)
 
