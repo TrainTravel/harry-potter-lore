@@ -2,13 +2,13 @@
   "schema_version": 1,
   "embedding_model": "all-MiniLM-L6-v2",
   "program_hashes": {
+    "perspective_shift": "dede3aafeccc5cf3176d287312d31a20319fed05a10a6e5b4d58a03cb5459cae",
+    "satirical_podcast": "7e0bd704afa07e693dad895304cda9788959ba090f0cafdc3a67ef62767eaf05",
+    "exam_grader": "a1173a4b86eae5c7256ce593c5f1d8bb31249e85114287a584857d88702c6fd1",
+    "debate": "5c581643d627e34918224cb6f39e6047595b80db5a1ef3ab9e743d8a2deea27f",
+    "guided_learning": "1c21e995ebcdb1d93d5187868531ab7750013ab5ba2f83e6e39f0caef4d19339",
     "open_analysis": "d953e32ab1c4d760f60814ec7dbc8771b68ed055d0a63dc0aff72729ff1c3a59",
-    "exam_grader": "2affee0d0bf306809e0f222c4a23a557708435098b4939ac3df23617865769c2",
-    "perspective_shift": "5847e3a9d01e0e6e7c3048ee441e74e262bb9df994bc0181b1b84ea9af598e96",
-    "deep_research": "1c7d3de98c97be3393795e3fc891223d16802c738c94fe9d897ca2423a97b3c2",
-    "guided_learning": "2dcca0f01f3455eeebb37739287736e0587b976d30c70cd60638e6699c0a5df2",
-    "satirical_podcast": "45bf9ff2fb002750cf9a54c08619edc1155a69805ce28c6995553774075774be",
-    "debate": "085fd748b8d63d0c6cd2419dd3aaa014f07bc9d1ce293df9efd6c2a38fbb198e"
+    "deep_research": "6ac2a287cb9478012996c8d414d25a2a590567f2643e3f89c9c7a5e98f8cb51b"
   },
-  "created_at": 1777376769.0747252
+  "created_at": 1777385209.76095
 }

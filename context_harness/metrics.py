@@ -319,17 +319,6 @@ def perspective_shift_metric(example, pred, trace=None) -> bool:
         if len(history_words & response_words) < 3:
             return False
 
-    # Sorting Hat commit guard: if ≥2 prior user turns, the response MUST
-    # contain a house name (the Hat must commit by turn 3). On earlier turns
-    # the Hat is still asking trait-assessment questions, so no constraint.
-    character = (getattr(example, "character", "") or "").lower().replace(" ", "-")
-    if character in ("sorting-hat", "the-sorting-hat"):
-        user_turns = chat_history.count("User:")
-        if user_turns >= 2:
-            _HOUSES = {"gryffindor", "hufflepuff", "ravenclaw", "slytherin"}
-            if not any(h in char_response.lower() for h in _HOUSES):
-                return False
-
     return True
 
 

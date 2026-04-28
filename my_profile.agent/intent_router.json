@@ -4,75 +4,35 @@
     "train": [],
     "demos": [
       {
-        "user_message": "What does the Mirror of Erised say about human psychology?",
-        "mode": "open_analysis",
-        "kwargs_json": "{}",
-        "confidence": "high"
-      },
-      {
-        "user_message": "Solve this equation: 2x + 3 = 7",
-        "mode": "none",
-        "kwargs_json": "{}",
-        "confidence": "high"
-      },
-      {
-        "user_message": "Check my answer: The question was about who created Horcruxes. My answer: Voldemort invented Horcruxes to become immortal.",
-        "mode": "exam_grader",
-        "kwargs_json": "{\"student_answer\": \"Voldemort invented Horcruxes to become immortal.\"}",
-        "confidence": "high"
-      },
-      {
-        "user_message": "Mark this answer: Q: Name three Unforgivable Curses. A: Avada Kedavra, Crucio, and Expelliarmus.",
-        "mode": "exam_grader",
-        "kwargs_json": "{\"student_answer\": \"Avada Kedavra, Crucio, and Expelliarmus.\"}",
-        "confidence": "high"
-      },
-      {
-        "user_message": "Quiz me on the Deathly Hallows",
-        "mode": "guided_learning",
-        "kwargs_json": "{}",
-        "confidence": "high"
-      },
-      {
-        "user_message": "Compare the leadership styles of Dumbledore and Voldemort",
-        "mode": "open_analysis",
-        "kwargs_json": "{}",
-        "confidence": "high"
-      },
-      {
-        "user_message": "Make a funny podcast about house elves and gig economy labor",
-        "mode": "satirical_podcast",
-        "kwargs_json": "{\"modern_angle\": \"gig economy labor\"}",
-        "confidence": "high"
-      },
-      {
-        "user_message": "Argue both sides: were the Deathly Hallows more dangerous than Horcruxes?",
-        "mode": "debate",
-        "kwargs_json": "{}",
-        "confidence": "high"
-      },
-      {
-        "user_message": "How does the Marauder's Map work?",
+        "augmented": true,
+        "user_message": "What are the properties of the Elder Wand?",
+        "reasoning": "The user is asking a factual question about a specific object in Harry Potter lore. This falls under the `deep_research` mode. No specific parameters are needed.",
         "mode": "deep_research",
         "kwargs_json": "{}",
         "confidence": "high"
       },
       {
-        "user_message": "Was Snape really a hero?",
-        "mode": "debate",
+        "augmented": true,
+        "user_message": "Tell me about the Battle of Hogwarts",
+        "reasoning": "The user is asking for factual information about a specific event in Harry Potter lore. This falls under the `deep_research` mode.",
+        "mode": "deep_research",
         "kwargs_json": "{}",
         "confidence": "high"
       },
       {
-        "user_message": "Help me understand how Horcruxes work",
-        "mode": "guided_learning",
+        "augmented": true,
+        "user_message": "What spells did Voldemort use?",
+        "reasoning": "The user is asking for factual information about spells used by a specific character in the Harry Potter universe. This falls under the \"deep_research\" category as it requires retrieving specific details about lore.",
+        "mode": "deep_research",
         "kwargs_json": "{}",
         "confidence": "high"
       },
       {
-        "user_message": "Do a podcast about Quidditch as an extreme sport industry",
-        "mode": "satirical_podcast",
-        "kwargs_json": "{\"modern_angle\": \"extreme sport industry\"}",
+        "augmented": true,
+        "user_message": "Who were the original members of the Order of the Phoenix?",
+        "reasoning": "The user is asking a factual question about Harry Potter lore, specifically about the original members of the Order of the Phoenix. This falls under the `deep_research` mode.",
+        "mode": "deep_research",
+        "kwargs_json": "{}",
         "confidence": "high"
       },
       {
@@ -82,39 +42,21 @@
         "confidence": "medium"
       },
       {
-        "user_message": "Tell me about Snape",
-        "mode": "deep_research",
-        "kwargs_json": "{}",
-        "confidence": "medium"
-      },
-      {
-        "user_message": "Tell me about the Lord of the Rings",
-        "mode": "none",
+        "user_message": "Quiz me on the Deathly Hallows",
+        "mode": "guided_learning",
         "kwargs_json": "{}",
         "confidence": "high"
       },
       {
-        "user_message": "I'm going through a hard time. What would Luna say?",
-        "mode": "perspective_shift",
-        "kwargs_json": "{\"character\": \"Luna\"}",
-        "confidence": "high"
-      },
-      {
-        "user_message": "What are the properties of the Elder Wand?",
-        "mode": "deep_research",
-        "kwargs_json": "{}",
-        "confidence": "high"
-      },
-      {
-        "user_message": "Is Hogwarts an effective educational institution by modern standards?",
+        "user_message": "Why did Snape become the person he became?",
         "mode": "open_analysis",
         "kwargs_json": "{}",
         "confidence": "high"
       },
       {
-        "user_message": "How would Hermione handle imposter syndrome at a new job?",
-        "mode": "perspective_shift",
-        "kwargs_json": "{\"character\": \"Hermione\"}",
+        "user_message": "Was Snape really a hero?",
+        "mode": "debate",
+        "kwargs_json": "{}",
         "confidence": "high"
       }
     ],

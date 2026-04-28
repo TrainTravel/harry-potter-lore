@@ -247,18 +247,6 @@ def test_detect_character_returns_none_for_no_character():
 
 
 # ---------------------------------------------------------------------------
-# Sorting Hat slug resolution
-# ---------------------------------------------------------------------------
-
-def test_sorting_hat_slug_resolution():
-    from context_harness.dspy_agent import _normalize_character
-    assert _normalize_character("Sorting Hat") == "sorting-hat"
-    assert _normalize_character("sorting hat") == "sorting-hat"
-    assert _normalize_character("The Sorting Hat") == "sorting-hat"
-    assert _normalize_character("the sorting hat") == "sorting-hat"
-
-
-# ---------------------------------------------------------------------------
 # OpenAnalysisModule — character-aware retrieval split
 # ---------------------------------------------------------------------------
 

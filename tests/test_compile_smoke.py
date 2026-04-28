@@ -174,36 +174,6 @@ def test_perspective_shift_compile(pipeline):
     assert compiled is not None
 
 
-def test_perspective_shift_sorting_hat_compile(pipeline):
-    """Sorting Hat multi-turn examples must survive compile. The metric's
-    commit guard fires on turn 3 (≥2 prior User: turns). DummyLM's
-    character_response must contain a house name for the turn-3 example to
-    pass, so we override DummyLM with a house-mentioning answer."""
-    from data.trainset_perspective_shift import TRAINSET
-
-    # Find the Sorting Hat trainset examples
-    hat_examples = [
-        ex for ex in TRAINSET
-        if (getattr(ex, "character", "") or "").lower().replace(" ", "-") == "sorting-hat"
-    ]
-    assert len(hat_examples) >= 3, "Need at least 3 Sorting Hat trainset examples"
-
-    # Override DummyLM with a response that mentions a house (passes commit guard)
-    hat_dummy = DummyLM(answers=[{
-        **_DUMMY_ANSWER,
-        "character_response": (
-            "Loyalty above all else. Better be... HUFFLEPUFF!"
-        ),
-    }])
-    dspy.configure(lm=hat_dummy)
-
-    module = PerspectiveShiftModule(pipeline, k=2)
-    compiled = _optimizer(perspective_shift_metric).compile(
-        module, trainset=hat_examples[:2],
-    )
-    assert compiled is not None
-
-
 # ---------------------------------------------------------------------------
 # Canonical-rule invariant: router introspection must find a primary input
 # field for every mode, and that field must be a real forward() parameter.

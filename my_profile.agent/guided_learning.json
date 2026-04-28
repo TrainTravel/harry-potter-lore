@@ -4,39 +4,48 @@
     "train": [],
     "demos": [
       {
-        "question": "Why did Dumbledore trust Snape?",
-        "past_attempts": "Because Snape switched sides after Lily's death?",
-        "hint": "You're right about the trigger — but what specifically convinced Dumbledore that Snape's change was permanent rather than convenient?",
-        "next_question": "What did Dumbledore ask Snape to do that a bad actor would never agree to?",
-        "explanation": "Trust in the Order was rarely built on past loyalty alone. Dumbledore relied on commitments that could only be upheld by someone who had genuinely changed — not by someone merely pretending to."
-      },
-      {
-        "question": "What makes the Elder Wand so powerful?",
-        "past_attempts": "none",
-        "hint": "Consider how ownership of a wand is normally decided. What if that rule operated more strictly for one particular wand?",
-        "next_question": "How might one become the master of the Elder Wand without ever holding it?",
-        "explanation": "The wand's power is tied to its allegiance, which follows victory rather than purchase or inheritance. Mastery is less about possession and more about a specific kind of event."
-      },
-      {
-        "question": "How is Fiendfyre different from normal fire?",
-        "past_attempts": "none",
-        "hint": "Think about what kind of magic Crabbe used it for, and why it destroyed a Horcrux when ordinary Incendio cannot. What quality makes Fiendfyre dangerous to its caster too?",
-        "next_question": "What category of magic includes curses that don't simply obey the wand-wielder?",
-        "explanation": "Fiendfyre sits in a category of magic that is less controlled than invoked. Its power to destroy unusual objects comes at the cost of being near-impossible to stop once released."
-      },
-      {
-        "question": "Why does Harry keep the Invisibility Cloak but return the Stone?",
-        "past_attempts": "Is it because the Stone drove Cadmus mad?",
-        "hint": "That's the right lesson from the Peverell story — but also think about what each Hallow offers to its owner and which offer is most dangerous to accept.",
-        "next_question": "Which of the three Hallows represents acceptance of death rather than denial?",
-        "explanation": "The three objects map onto three attitudes toward mortality. Harry's choice reflects which attitude he adopts, not merely which object is most useful."
-      },
-      {
+        "augmented": true,
         "question": "Why did Snape behave cruelly toward Harry?",
+        "context": "[severus-snape] Severus Snape was born on 9 January 1960 to Eileen Prince, a witch, and Tobias Snape, a Muggle. He grew up in Spinner's End in a working-class area near a river. As a child he befriended his neighbour Lily Evans, who later became Lily Potter, and developed a deep and lifelong love for her. He attended Hogwarts and was sorted into Slytherin, where he excelled particularly in Potions and the Dark Arts. He became a Death Eater in his youth but defected to Dumbledore's side after Voldemort targeted Lily. After Lily's death he acted as a double agent — appearing loyal to Voldemort while secretly working for the Order of the Phoenix — a role he maintained until his death. He served as Potions Master and later Defence Against the Dark Arts teacher and briefly headmaster of Hogwarts. He carried out Dumbledore's request to kill him, ensuring his own position as Voldemort's most trusted servant. He was killed by Nagini on Voldemort's orders when Voldemort incorrectly believed Snape was the master of the Elder Wand. His memories, given to Harry in his final moments, revealed his lifelong love for Lily and his true loyalty to Dumbledore.\n\n[harry-potter] Harry James Potter was born on 31 July 1980 to James and Lily Potter. As an infant he survived the Killing Curse cast by Lord Voldemort, which instead rebounded and destroyed Voldemort's body, leaving Harry with a lightning-bolt scar on his forehead. This made him famous throughout the wizarding world as \"The Boy Who Lived.\" Harry was raised by his aunt and uncle, Petunia and Vernon Dursley, in a Muggle household at 4 Privet Drive, Little Whinging, Surrey, where he had no knowledge of his magical heritage until his eleventh birthday. He attended Hogwarts from 1991 to 1997, was sorted into Gryffindor, and became the youngest Seeker in a century. Throughout his time at Hogwarts he confronted Voldemort multiple times and ultimately defeated him in the Battle of Hogwarts in May 1998. Harry was gifted with a stag Patronus, which reflected his father's Animagus form. After the war he joined the Auror Office and later became Head Auror and eventually Head of the Department of Magical Law Enforcement. He married Ginevra Weasley and had three children: James Sirius, Albus Severus, and Lily Luna Potter.\n\n[albus-dumbledore] Albus Percival Wulfric Brian Dumbledore was the headmaster of Hogwarts School of Witchcraft and Wizardry and is widely considered the greatest wizard of the modern era. Born in 1881, he was the son of Percival and Kendra Dumbledore. His early life was marked by tragedy when his sister Ariana was attacked by Muggle boys, an event that shaped the entire family's future. Dumbledore attended Hogwarts and was sorted into Gryffindor, where he proved himself extraordinarily gifted. He became the Transfiguration professor and eventually headmaster. He was the founder and leader of the Order of the Phoenix, an organisation dedicated to fighting Lord Voldemort. Dumbledore wielded the Elder Wand, the most powerful wand in existence, and was the possessor of all three Deathly Hallows at one point in his life. He died at the top of the Astronomy Tower, killed by Severus Snape, which was later revealed to be part of his own plan to protect Draco Malfoy and to ensure Snape's standing with Voldemort.",
         "past_attempts": "Maybe Snape hated James Potter and took it out on Harry?",
-        "hint": "You're on the right track about James — but consider who else Snape knew in school. Whose memory did he carry for decades?",
-        "next_question": "What might someone do to stay close to a child whose mother they once loved?",
-        "explanation": "The behaviour makes sense only when you consider loyalty and grief operating underneath hostility. The surface cruelty is a mask for a much older commitment."
+        "chat_history": "",
+        "reasoning": "The learner correctly identifies that Snape's cruelty might stem from his feelings about James Potter. This is a good starting point, as the provided text confirms Snape's animosity towards James. The next step is to guide the learner to connect Snape's past feelings about James to his behavior towards Harry, considering Snape's deeper motivations and loyalties as revealed in the text.",
+        "hint": "You're on the right track! Snape certainly had a very difficult history with James Potter. How might seeing a reflection of James in Harry have affected Snape, especially given Snape's other, deeper loyalties?",
+        "next_question": "What was Snape's ultimate motivation for opposing Voldemort, and how might that have influenced his feelings about Harry?",
+        "explanation": "Snape's animosity towards James Potter is well-documented, and this animosity certainly colored his interactions with Harry. However, Snape's cruelty was not solely based on a simple dislike of Harry's father. His actions were also deeply intertwined with his complex loyalties and a tragic past love."
+      },
+      {
+        "augmented": true,
+        "question": "Why did Voldemort fail to kill Harry as a baby?",
+        "context": "[harry-potter] Harry James Potter was born on 31 July 1980 to James and Lily Potter. As an infant he survived the Killing Curse cast by Lord Voldemort, which instead rebounded and destroyed Voldemort's body, leaving Harry with a lightning-bolt scar on his forehead. This made him famous throughout the wizarding world as \"The Boy Who Lived.\" Harry was raised by his aunt and uncle, Petunia and Vernon Dursley, in a Muggle household at 4 Privet Drive, Little Whinging, Surrey, where he had no knowledge of his magical heritage until his eleventh birthday. He attended Hogwarts from 1991 to 1997, was sorted into Gryffindor, and became the youngest Seeker in a century. Throughout his time at Hogwarts he confronted Voldemort multiple times and ultimately defeated him in the Battle of Hogwarts in May 1998. Harry was gifted with a stag Patronus, which reflected his father's Animagus form. After the war he joined the Auror Office and later became Head Auror and eventually Head of the Department of Magical Law Enforcement. He married Ginevra Weasley and had three children: James Sirius, Albus Severus, and Lily Luna Potter.\n\n[lord-voldemort] Tom Marvolo Riddle, who renamed himself Lord Voldemort, was born on 31 December 1926 to a Muggle father, Tom Riddle Sr, and a witch mother, Merope Gaunt, who died shortly after his birth. He grew up in a Muggle orphanage in London, already displaying disturbing control over his magic. He attended Hogwarts from 1938 to 1945 and was sorted into Slytherin, where he was charming and ambitious. He opened the Chamber of Secrets in his fifth year, causing the death of Myrtle Warren. After leaving Hogwarts he worked briefly at Borgin and Burkes before disappearing to pursue the Dark Arts. He created seven Horcruxes — receptacles for fragments of his soul — to achieve immortality: his diary, Marvolo Gaunt's ring, Slytherin's locket, Helga Hufflepuff's cup, Rowena Ravenclaw's diadem, Nagini the snake, and unknowingly Harry Potter himself. Voldemort waged two wizarding wars, amassing followers called Death Eaters. He was finally defeated and killed by his own rebounding Killing Curse during the Battle of Hogwarts when Harry survived the curse due to Voldemort's use of the Elder Wand, which ultimately owed its allegiance to Harry.\n\n[severus-snape] Severus Snape was born on 9 January 1960 to Eileen Prince, a witch, and Tobias Snape, a Muggle. He grew up in Spinner's End in a working-class area near a river. As a child he befriended his neighbour Lily Evans, who later became Lily Potter, and developed a deep and lifelong love for her. He attended Hogwarts and was sorted into Slytherin, where he excelled particularly in Potions and the Dark Arts. He became a Death Eater in his youth but defected to Dumbledore's side after Voldemort targeted Lily. After Lily's death he acted as a double agent — appearing loyal to Voldemort while secretly working for the Order of the Phoenix — a role he maintained until his death. He served as Potions Master and later Defence Against the Dark Arts teacher and briefly headmaster of Hogwarts. He carried out Dumbledore's request to kill him, ensuring his own position as Voldemort's most trusted servant. He was killed by Nagini on Voldemort's orders when Voldemort incorrectly believed Snape was the master of the Elder Wand. His memories, given to Harry in his final moments, revealed his lifelong love for Lily and his true loyalty to Dumbledore.",
+        "past_attempts": "Was it because of some kind of magical shield?",
+        "chat_history": "",
+        "reasoning": "The user is asking about the specific reason Harry survived Voldemort's initial attack. The provided `past_attempts` suggests the user is thinking about a protective barrier. The context mentions the curse rebounding and destroying Voldemort's body, leaving Harry with a scar. The concept of Horcruxes is also relevant as Voldemort unknowingly made Harry one. This suggests the answer lies in a combination of Lily's sacrifice and Voldemort's fragmented soul.",
+        "hint": "That's a good thought, but think more about the *nature* of the magic Voldemort used and the sacrifice Lily made for Harry. What kind of love creates a powerful magical shield?",
+        "next_question": "What was special about Lily's sacrifice that the Killing Curse couldn't overcome?",
+        "explanation": "The survival wasn't due to a physical shield, but rather a powerful, ancient form of magic activated by maternal love. This protective magic offered by Lily's sacrifice created a unique defense that even Voldemort's most terrible curse couldn't break."
+      },
+      {
+        "augmented": true,
+        "question": "Why can't Voldemort use the Elder Wand effectively against Harry?",
+        "context": "[albus-dumbledore] Albus Percival Wulfric Brian Dumbledore was the headmaster of Hogwarts School of Witchcraft and Wizardry and is widely considered the greatest wizard of the modern era. Born in 1881, he was the son of Percival and Kendra Dumbledore. His early life was marked by tragedy when his sister Ariana was attacked by Muggle boys, an event that shaped the entire family's future. Dumbledore attended Hogwarts and was sorted into Gryffindor, where he proved himself extraordinarily gifted. He became the Transfiguration professor and eventually headmaster. He was the founder and leader of the Order of the Phoenix, an organisation dedicated to fighting Lord Voldemort. Dumbledore wielded the Elder Wand, the most powerful wand in existence, and was the possessor of all three Deathly Hallows at one point in his life. He died at the top of the Astronomy Tower, killed by Severus Snape, which was later revealed to be part of his own plan to protect Draco Malfoy and to ensure Snape's standing with Voldemort.\n\n[harry-potter] Harry James Potter was born on 31 July 1980 to James and Lily Potter. As an infant he survived the Killing Curse cast by Lord Voldemort, which instead rebounded and destroyed Voldemort's body, leaving Harry with a lightning-bolt scar on his forehead. This made him famous throughout the wizarding world as \"The Boy Who Lived.\" Harry was raised by his aunt and uncle, Petunia and Vernon Dursley, in a Muggle household at 4 Privet Drive, Little Whinging, Surrey, where he had no knowledge of his magical heritage until his eleventh birthday. He attended Hogwarts from 1991 to 1997, was sorted into Gryffindor, and became the youngest Seeker in a century. Throughout his time at Hogwarts he confronted Voldemort multiple times and ultimately defeated him in the Battle of Hogwarts in May 1998. Harry was gifted with a stag Patronus, which reflected his father's Animagus form. After the war he joined the Auror Office and later became Head Auror and eventually Head of the Department of Magical Law Enforcement. He married Ginevra Weasley and had three children: James Sirius, Albus Severus, and Lily Luna Potter.\n\n[deathly-hallows] The Deathly Hallows are three legendary magical objects said to have been created by Death and given to the Peverell brothers: the Elder Wand, the Resurrection Stone, and the Invisibility Cloak. According to the tale \"The Tale of the Three Brothers\" in The Tales of Beedle the Bard, Death gifted the three objects after the brothers tricked him at a river crossing. The Elder Wand, also known as the Deathstick or the Wand of Destiny, is the most powerful wand in existence; it was given to the eldest Peverell brother, Antioch, who was killed for it. The Resurrection Stone, given to the middle brother Cadmus, has the power to recall the dead as shades; Cadmus used it to attempt to bring back a dead lover but was driven to suicide by grief. The Invisibility Cloak, given to the youngest brother Ignotus, is uniquely powerful in that it renders the wearer truly invisible with no degradation over time; Ignotus passed it down through his family's generations until it reached James Potter and eventually Harry. One who possesses all three Hallows is said to become the Master of Death. Dumbledore possessed all three objects at different points in his life. Harry ultimately possessed all three at the Battle of Hogwarts, though he chose to return the Stone to the forest and keep only the Cloak.",
+        "past_attempts": "The Elder Wand didn't really belong to Voldemort because he killed Snape who didn't actually own it?",
+        "chat_history": "",
+        "reasoning": "The user is asking about why Voldemort's use of the Elder Wand is ineffective against Harry. The past attempt correctly identifies that Voldemort's claim to the Elder Wand is flawed because Snape, whom Voldemort killed, was not the true master. This is a good starting point, but it doesn't fully explain why this affects the wand's power *against Harry*. The hint needs to guide the user to consider the concept of wand allegiance and how it pertains to Harry specifically.",
+        "hint": "You're on the right track that Voldemort didn't truly win the Elder Wand's allegiance. But it's not just about who killed whom. Think about *how* wand allegiance is won and lost, and to whom Harry has a unique connection that might supersede Voldemort's claim.",
+        "next_question": "Who was the last known master of the Elder Wand before Voldemort dueled Snape?",
+        "explanation": "The Elder Wand, like all wands, has an allegiance to its master. This allegiance is won not just by defeating a wizard, but by disarming or defeating the *current master* of the wand. Voldemort believed he had mastered the wand by killing Snape, but this overlooked the true line of succession."
+      },
+      {
+        "augmented": true,
+        "question": "How is the Sorting Hat able to read minds?",
+        "context": "[deathly-hallows] The Deathly Hallows are three legendary magical objects said to have been created by Death and given to the Peverell brothers: the Elder Wand, the Resurrection Stone, and the Invisibility Cloak. According to the tale \"The Tale of the Three Brothers\" in The Tales of Beedle the Bard, Death gifted the three objects after the brothers tricked him at a river crossing. The Elder Wand, also known as the Deathstick or the Wand of Destiny, is the most powerful wand in existence; it was given to the eldest Peverell brother, Antioch, who was killed for it. The Resurrection Stone, given to the middle brother Cadmus, has the power to recall the dead as shades; Cadmus used it to attempt to bring back a dead lover but was driven to suicide by grief. The Invisibility Cloak, given to the youngest brother Ignotus, is uniquely powerful in that it renders the wearer truly invisible with no degradation over time; Ignotus passed it down through his family's generations until it reached James Potter and eventually Harry. One who possesses all three Hallows is said to become the Master of Death. Dumbledore possessed all three objects at different points in his life. Harry ultimately possessed all three at the Battle of Hogwarts, though he chose to return the Stone to the forest and keep only the Cloak.\n\n[hogwarts] Hogwarts School of Witchcraft and Wizardry is the foremost school of magic in Great Britain and arguably the most prestigious wizarding school in the world. It was founded over a thousand years ago by four of the greatest witches and wizards of their age: Godric Gryffindor, Helga Hufflepuff, Rowena Ravenclaw, and Salazar Slytherin. The castle is located in the Scottish Highlands and is hidden from Muggles by a variety of enchantments; if a Muggle looks at the site they see only a ruin with warning signs. The school accepts students from the ages of eleven to seventeen, admitting those who demonstrate magical ability. Students are divided into four houses — Gryffindor, Hufflepuff, Ravenclaw, and Slytherin — by the Sorting Hat, a sentient enchanted artefact that was once Gryffindor's hat. Each house has its own common room, dormitories, head of house, and ghost. Students study a core curriculum including Transfiguration, Charms, Potions, History of Magic, Astronomy, Herbology, and Defence Against the Dark Arts, with elective subjects available from third year onwards. The school year runs from September to June, with students travelling from King's Cross station in London on the Hogwarts Express, a scarlet steam locomotive, via Platform Nine and Three-Quarters.\n\n[horcruxes] A Horcrux is an object in which a Dark wizard or witch has hidden a fragment of their soul for the purposes of attaining immortality. Creating a Horcrux involves committing murder — the act of killing another human being tears the soul — and then performing a specific and irreversible piece of Dark Magic to split the soul fragment and encase it. Because part of the creator's soul resides in the Horcrux, the creator cannot truly die while the Horcrux remains intact. Lord Voldemort pushed this magic further than anyone in history, splitting his soul into seven pieces by committing six murders, leaving one piece in his body and encasing the other six in Horcruxes. The known Horcruxes were: Tom Riddle's diary (destroyed by Harry Potter with a Basilisk fang), Marvolo Gaunt's ring (destroyed by Dumbledore with the Sword of Gryffindor), Slytherin's locket (destroyed by Ron Weasley with the Sword of Gryffindor), Hufflepuff's cup (destroyed by Hermione Granger with a Basilisk fang), Ravenclaw's diadem (destroyed by Vincent Crabbe's Fiendfyre), Nagini the snake (destroyed by Neville Longbottom with the Sword of Gryffindor), and inadvertently Harry Potter himself (destroyed when Voldemort cast the Killing Curse on Harry in the Forbidden Forest). The process of destroying a Horcrux requires a substance or force powerful enough to cause irrevocable damage before the fragment can repair itself.",
+        "past_attempts": "none",
+        "chat_history": "",
+        "reasoning": "The user is asking about the mechanism by which the Sorting Hat accesses a student's mind to determine their house. The provided context states the Sorting Hat is a \"sentient enchanted artefact that was once Gryffindor's hat.\" This implies it has magical properties that allow it to function. I need to explain how a magical artifact can interact with a person's thoughts.",
+        "hint": "The Sorting Hat is described as \"sentient\" and \"enchanted.\" Think about what kinds of magic might allow an object to perceive or interact with a person's thoughts or intentions.",
+        "next_question": "What kind of magical ability would allow an object to understand a person's innermost qualities?",
+        "explanation": "Magical objects can be imbued with unique properties by powerful wizards. For the Sorting Hat, this includes the ability to delve into a student's mind and assess their character, personality, and potential, much like a Legilimens can read thoughts."
       },
       {
         "question": "Why did Voldemort specifically hunt the Potters?",
@@ -46,25 +55,18 @@
         "explanation": "Prophecies gain their force through who acts on them. The Potters became the target because of Voldemort's interpretation — someone else could have fit the prophecy just as well."
       },
       {
-        "question": "What makes Hogwarts hidden from Muggles?",
+        "question": "How can a chess set sacrifice itself for Ron?",
         "past_attempts": "none",
-        "hint": "Magical concealment rarely works by simply blocking sight. What might a Muggle see instead, if the castle can't simply be invisible?",
-        "next_question": "What kind of enchantment would discourage a Muggle from investigating further?",
-        "explanation": "Concealment in the wizarding world often layers substitution and suggestion rather than pure invisibility — the Muggle sees something, but something that prompts them to leave."
+        "hint": "Start with what Wizard's Chess already does on an ordinary board — the pieces aren't inert. How might McGonagall extend that to an obstacle course?",
+        "next_question": "What transfiguration or charm might animate chess pieces at human scale?",
+        "explanation": "The challenge is a scaled-up version of routine wizarding chess behaviour rather than a special artefact — which is the pattern for most of the obstacles guarding the Philosopher's Stone."
       },
       {
-        "question": "Why didn't Harry die in the Forbidden Forest?",
-        "past_attempts": "I'm not sure — did the curse miss?",
-        "hint": "The curse didn't miss. Think about what Voldemort was actually destroying when he cast it at Harry — and why Harry's own body could survive that.",
-        "next_question": "If something of Voldemort was hidden inside Harry, what would a Killing Curse target first?",
-        "explanation": "The event is best understood as Voldemort destroying his own foreign fragment rather than Harry himself. Harry's survival turns on what he was carrying, not on the curse failing."
-      },
-      {
-        "question": "How is the Sorting Hat able to read minds?",
+        "question": "How is Fiendfyre different from normal fire?",
         "past_attempts": "none",
-        "hint": "Think about where the Hat originated. An object made by a powerful witch or wizard can carry something of them — what might Godric Gryffindor have left inside it?",
-        "next_question": "What would it mean for a founder's intentions and judgment to persist in an object?",
-        "explanation": "Enchanted objects in the wizarding world can hold more than a single spell — they can carry aspects of their creators' minds. The Hat is an example of this rather than an exception."
+        "hint": "Think about what kind of magic Crabbe used it for, and why it destroyed a Horcrux when ordinary Incendio cannot. What quality makes Fiendfyre dangerous to its caster too?",
+        "next_question": "What category of magic includes curses that don't simply obey the wand-wielder?",
+        "explanation": "Fiendfyre sits in a category of magic that is less controlled than invoked. Its power to destroy unusual objects comes at the cost of being near-impossible to stop once released."
       },
       {
         "question": "Why is a Patronus unique to each wizard?",
@@ -72,41 +74,6 @@
         "hint": "Personality is part of it, but not the whole. The Patronus charm pulls from a deeper well — what emotion does the caster have to hold on to?",
         "next_question": "What connection between two people might cause their Patronuses to mirror each other?",
         "explanation": "A Patronus emerges from a specific psychological state the caster must access. Its form therefore encodes more than identity — it can encode love, loss, and imprinting."
-      },
-      {
-        "question": "Why is Nagini harder to destroy than a typical Horcrux object?",
-        "past_attempts": "none",
-        "hint": "Most Horcruxes are inanimate — they sit and wait. What makes a living Horcrux different from a cup or a diadem?",
-        "next_question": "Why would Voldemort keep his most mobile Horcrux physically close to him?",
-        "explanation": "A living Horcrux introduces agency and mobility into what is normally a static target. This changes both the protection strategy and the destruction strategy."
-      },
-      {
-        "question": "Why did Voldemort fail to kill Harry as a baby?",
-        "past_attempts": "Was it because of some kind of magical shield?",
-        "hint": "Close — but think about who cast the shield, and what they had to do. Is there any form of magic older than spells?",
-        "next_question": "What kind of sacrifice creates lasting protection in the wizarding world?",
-        "explanation": "The event hinges on a form of magic older than wandwork. It's not a charm or a counter-curse — it's what someone chose to do, and why."
-      },
-      {
-        "question": "Why can't Voldemort use the Elder Wand effectively against Harry?",
-        "past_attempts": "The Elder Wand didn't really belong to Voldemort because he killed Snape who didn't actually own it?",
-        "hint": "Exactly the right thread. Now trace it one step further — if Snape wasn't the true owner, who had actually won the wand's allegiance earlier?",
-        "next_question": "When did the wand's allegiance shift, and what simple act caused it?",
-        "explanation": "The chain of mastery passes through an ordinary, almost forgettable moment — not the dramatic killing Voldemort witnessed. This is why the wand turns against its wielder at the decisive moment."
-      },
-      {
-        "question": "What is a Horcrux?",
-        "past_attempts": "none",
-        "hint": "Think about what someone might do if they feared death more than anything. What if a wizard could hide a piece of themselves in an object?",
-        "next_question": "What kind of act would be required to split a soul in the first place?",
-        "explanation": "The concept connects immortality with an irreversible form of dark magic. It hinges on the idea that the soul can be divided — the object is secondary to the act that fragments it."
-      },
-      {
-        "question": "How can a chess set sacrifice itself for Ron?",
-        "past_attempts": "none",
-        "hint": "Start with what Wizard's Chess already does on an ordinary board — the pieces aren't inert. How might McGonagall extend that to an obstacle course?",
-        "next_question": "What transfiguration or charm might animate chess pieces at human scale?",
-        "explanation": "The challenge is a scaled-up version of routine wizarding chess behaviour rather than a special artefact — which is the pattern for most of the obstacles guarding the Philosopher's Stone."
       }
     ],
     "signature": {

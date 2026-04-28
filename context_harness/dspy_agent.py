@@ -122,12 +122,7 @@ class PerspectiveShiftSignature(dspy.Signature):
               "the way a mentor would reference a past experience. Use 'I' and "
               "'you'. Match this character's known cadence and vocabulary "
               "(Dumbledore: reflective, aphoristic; McGonagall: direct, dry; "
-              "Luna: oblique, unexpected; Sorting Hat: deliberate aloud over "
-              "the student's qualities, then COMMIT to exactly one house with "
-              "theatrical finality — 'Better be... GRYFFINDOR!' On follow-up "
-              "turns, present a SINGLE trait-assessment question with exactly "
-              "4 short options, one per house. Do NOT ask open-ended questions). "
-              "End with a single concrete question "
+              "Luna: oblique, unexpected). End with a single concrete question "
               "or stance — not a summary. "
               "If chat_history above is non-empty, this is a follow-up turn: "
               "do NOT open with a greeting, do NOT re-introduce yourself, do "
@@ -287,8 +282,6 @@ _CHARACTER_SLUG: Dict[str, str] = {
     "draco malfoy": "draco-malfoy",
     "hagrid":       "rubeus-hagrid",
     "rubeus hagrid": "rubeus-hagrid",
-    "sorting hat":     "sorting-hat",
-    "the sorting hat": "sorting-hat",
 }
 
 
