@@ -380,8 +380,48 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
     agent = get_agent(req.collection_name)
     pipeline = _pipelines_cache[req.collection_name]
 
+    # --- Sorting Hat character heuristic ---
+    # Lovable sends character="Dumbledore" by default. When the user clearly
+    # wants the Sorting Hat (e.g., "sort me into a house"), redirect the
+    # default character to Sorting Hat so the perspective_shift demos +
+    # voice land correctly. Only fires when the client sent the default —
+    # an explicit non-Dumbledore character is always respected.
+    _SORTING_INTENT = _re.compile(
+        r"\bsort(\s+me|ing\s+hat)\b|\bwhich\s+(hogwarts\s+)?house\b|"
+        r"\binto\s+a(\s+hogwarts)?\s+house\b",
+        _re.IGNORECASE,
+    )
+    if (req.character == "Dumbledore"
+            and _SORTING_INTENT.search(req.question)):
+        req.character = "Sorting Hat"
+
+    # --- Multi-turn stickiness ---
+    # If this conversation has prior turns in a chat-eligible mode, inherit
+    # the prior mode and character. Without this, follow-up turns like
+    # "i would take a look at it" hit the intent router with no context,
+    # get classified as off-topic, and lose the conversation thread. Mode
+    # is sticky once set; character is inherited only when the client sent
+    # the default ("Dumbledore"), so explicit picks are still respected.
+    inherited_from_prior = False
+    if req.conversation_id:
+        _store = _get_conversation_store()
+        _prior = _store.load_history(req.conversation_id, max_turns=1)
+        if _prior.turns:
+            last_turn = _prior.turns[-1]
+            if last_turn.mode in _CHAT_MODES:
+                if req.mode == "auto" or req.mode != last_turn.mode:
+                    req.mode = last_turn.mode
+                    inherited_from_prior = True
+                if (last_turn.character
+                        and req.character == "Dumbledore"
+                        and last_turn.character != "Dumbledore"):
+                    req.character = last_turn.character
+
     turn_id = str(uuid.uuid4())
-    _record(turn_id, "turn.start", {"question": req.question, "mode": req.mode})
+    _record(turn_id, "turn.start", {
+        "question": req.question, "mode": req.mode,
+        "inherited_from_prior": inherited_from_prior,
+    })
 
     t_retrieve = time.perf_counter()
     k = {"deep_research": 10, "open_analysis": 7, "perspective_shift": 5,
