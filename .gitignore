@@ -8,6 +8,7 @@ build/
 .env
 data/*
 !data/hp_lore.txt
+!data/SOURCES.md
 !data/trainset_*.py
 # Character-lore pipeline artifacts (small, reproducible, worth tracking)
 !data/character_lore.jsonl
