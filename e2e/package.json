@@ -8,7 +8,10 @@
     "test:smoke": "playwright test tests/smoke.spec.ts",
     "test:a11y": "playwright test tests/accessibility.spec.ts",
     "test:visual": "playwright test tests/visual.spec.ts",
-    "report": "playwright show-report"
+    "report": "playwright show-report",
+    "ui-critique:explore": "npx -y tsx scripts/explore.ts",
+    "ui-critique:critique": "npx -y tsx scripts/critique.ts",
+    "ui-critique": "npm run ui-critique:explore && npm run ui-critique:critique"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.0",

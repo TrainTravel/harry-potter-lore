@@ -1,0 +1,59 @@
+name: UI Critique (weekly)
+
+# Drives the live Lovable UI through scripted journeys, captures screenshots,
+# and asks Claude to critique them. Outputs the critique + screenshots as a
+# CI artifact.
+#
+# Cost: ~$0.20-0.40 per run (Claude Opus 4.x, 5 screenshots).
+# Frequency: weekly Sunday 09:00 UTC = once per week, ~$1-2/month.
+# Manual trigger: workflow_dispatch from the Actions tab.
+#
+# Required secret:
+#   ANTHROPIC_API_KEY — for the critique call. Set via repo Settings →
+#   Secrets and variables → Actions.
+
+on:
+  schedule:
+    # Sunday 09:00 UTC ≈ Sunday 02:00 PT / 17:00 China time
+    - cron: "0 9 * * 0"
+  workflow_dispatch: {}
+
+jobs:
+  critique:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install e2e deps
+        working-directory: e2e
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Run exploration (screenshots)
+        working-directory: e2e
+        env:
+          FRONTEND_URL: https://lore-whisperer-ui.lovable.app
+        run: npm run ui-critique:explore
+
+      - name: Run critique (Claude API)
+        working-directory: e2e
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CRITIQUE_MODEL: claude-opus-4-5
+        run: npm run ui-critique:critique
+
+      - name: Upload critique + screenshots as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-critique-${{ github.run_number }}
+          path: e2e/screenshots/
+          retention-days: 90
