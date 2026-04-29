@@ -1,16 +1,17 @@
 name: UI Critique (weekly)
 
 # Drives the live Lovable UI through scripted journeys, captures screenshots,
-# and asks Claude to critique them. Outputs the critique + screenshots as a
-# CI artifact.
+# and asks Gemini 2.5 Pro to critique them. Outputs the critique +
+# screenshots as a CI artifact.
 #
-# Cost: ~$0.20-0.40 per run (Claude Opus 4.x, 5 screenshots).
-# Frequency: weekly Sunday 09:00 UTC = once per week, ~$1-2/month.
+# Cost: ~$0.05-0.10 per run (Gemini 2.5 Pro, 4 screenshots).
+# Frequency: weekly Sunday 09:00 UTC = once per week, ~$3-5/year.
 # Manual trigger: workflow_dispatch from the Actions tab.
 #
 # Required secret:
-#   ANTHROPIC_API_KEY — for the critique call. Set via repo Settings →
-#   Secrets and variables → Actions.
+#   GOOGLE_API_KEY — for the critique call. Same key the lore agent uses
+#   at runtime, so no separate billing relationship to manage. Set via
+#   repo Settings → Secrets and variables → Actions.
 
 on:
   schedule:
@@ -44,11 +45,11 @@ jobs:
           FRONTEND_URL: https://lore-whisperer-ui.lovable.app
         run: npm run ui-critique:explore
 
-      - name: Run critique (Claude API)
+      - name: Run critique (Gemini API)
         working-directory: e2e
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          CRITIQUE_MODEL: claude-opus-4-5
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          CRITIQUE_MODEL: gemini-2.5-pro
         run: npm run ui-critique:critique
 
       - name: Upload critique + screenshots as artifact
