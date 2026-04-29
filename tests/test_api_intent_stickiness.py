@@ -199,6 +199,60 @@ def test_auto_mode_continuation_high_confidence_switch_overrides_stickiness(
     assert decision["source"] == "router-override"
 
 
+def test_speed_toggle_maps_to_concrete_model(client, monkeypatch):
+    """Per-request `speed` label maps to a concrete model string. The
+    handler builds the LM with that model, so we patch dspy.LM and
+    verify the model_name passed in.
+    """
+    captured: dict = {}
+    real_lm = dspy.LM
+
+    def _spy(model_name, **kwargs):
+        captured["model"] = model_name
+        return real_lm(model_name, **kwargs)
+
+    monkeypatch.setattr("api.main.dspy.LM", _spy)
+
+    # speed=fast → flash-lite
+    r = client.post("/ask", json={
+        "question": "Who killed Dumbledore?",
+        "mode": "deep_research",
+        "speed": "fast",
+    })
+    assert r.status_code == 200
+    assert captured["model"] == "gemini/gemini-2.5-flash-lite"
+
+    # speed=quality → pro
+    r = client.post("/ask", json={
+        "question": "Who killed Dumbledore?",
+        "mode": "deep_research",
+        "speed": "quality",
+    })
+    assert r.status_code == 200
+    assert captured["model"] == "gemini/gemini-2.5-pro"
+
+    # speed omitted → server default (whatever DSPY_MODEL points to)
+    captured.clear()
+    r = client.post("/ask", json={
+        "question": "Who killed Dumbledore?",
+        "mode": "deep_research",
+    })
+    assert r.status_code == 200
+    # Whatever it is, must NOT be the speed-toggle values unless the env
+    # var happens to match. We just check the call happened.
+    assert "model" in captured
+
+
+def test_speed_invalid_value_is_rejected(client):
+    """Pydantic regex rejects anything other than 'fast' / 'quality'."""
+    r = client.post("/ask", json={
+        "question": "Who killed Dumbledore?",
+        "mode": "deep_research",
+        "speed": "potato",
+    })
+    assert r.status_code == 422  # Unprocessable Entity
+
+
 def test_explicit_mode_skips_stickiness(client, monkeypatch):
     """If client sends an explicit non-auto mode, no router/stickiness logic
     runs — caller named the mode, we honor it."""

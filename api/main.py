@@ -159,6 +159,14 @@ _output_filter = OutputFilter()
 MODEL = os.getenv("DSPY_MODEL", "gemini/gemini-2.5-flash-lite")
 AGENT_DIR = os.getenv("AGENT_DIR", "my_profile.agent")
 
+# Per-request speed/quality toggle. The UI sends a semantic label
+# ("fast" / "quality"); we map it to a concrete litellm model string.
+# Decoupling lets us swap the underlying models without UI changes.
+_SPEED_MODELS = {
+    "fast":    "gemini/gemini-2.5-flash-lite",  # ~$0.001/turn, ~5s
+    "quality": "gemini/gemini-2.5-pro",         # ~$0.03/turn, ~15-30s
+}
+
 
 # ---------------------------------------------------------------------------
 # In-memory trace store (swap for context_harness/tracer.py for durability)
@@ -191,6 +199,10 @@ class AskRequest(BaseModel):
     conversation_id: str | None = Field(default=None, description="Optional conversation thread id; only guided_learning uses it in Phase 0")
     student_answer: str = Field(default="", description="Student's answer for exam_grader mode")
     modern_angle: str = Field(default="modern life", description="Mundane contemporary lens for satirical_podcast mode")
+    # Per-request speed/quality toggle. "fast" → cheap small model, "quality" →
+    # slower bigger model. Omitted → use whatever DSPY_MODEL points to (server
+    # default). Lets the UI offer a speed/quality switch without redeploying.
+    speed: str | None = Field(default=None, pattern="^(fast|quality)$", description="Per-request model preference: fast | quality")
 
 
 class IngestRequest(BaseModel):
@@ -388,8 +400,16 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
         "latency_ms": (time.perf_counter() - t_retrieve) * 1000,
     })
 
-    # Prepare LLM per-request
-    model_name = MODEL if req.provider == "gemini" else req.provider
+    # Prepare LLM per-request. Resolution order:
+    #   1. req.speed semantic label ("fast" / "quality") if set
+    #   2. req.provider as a literal model string (legacy override)
+    #   3. DSPY_MODEL env var (server default)
+    if req.speed:
+        model_name = _SPEED_MODELS[req.speed]
+    elif req.provider != "gemini":
+        model_name = req.provider
+    else:
+        model_name = MODEL
     api_key = req.api_key or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
     lm = dspy.LM(model_name, api_key=api_key)
 
