@@ -222,6 +222,29 @@ through; verbose teacher demos drowned out the one labeled gold demo per
 recompile. Labeled-only routes all hand-written gold into the prompt, runtime
 imitates the canonical pattern.
 
+### Runtime model decision (2026-04-29)
+
+After comparing flash-lite vs Pro at runtime, **production runs Gemini 2.5 Pro**
+(`DSPY_MODEL=gemini/gemini-2.5-pro`). Reasons:
+
+- Flash-lite suffered from "trainset bleed" — when user input was thin
+  (e.g., *"any concrete suggestions?"*), it regurgitated trainset demos
+  even when chat_history disagreed. Pro reads chat_history correctly.
+- The fix is at runtime, not compile-time. Existing flash-lite-compiled
+  demos are good enough; runtime discipline is what matters.
+
+**Cost trade-off:** ~$0.02–0.05 per turn at Pro vs ~$0.001 at flash-lite
+(12.5–50× more expensive). At small-scale traffic this is pennies; revisit
+if usage grows.
+
+**Compile-time still uses flash-lite.** Bootstrap teacher quality matters
+less than runtime quality for our case. (See "Bootstrap vs labeled" above
+for when teacher choice matters.)
+
+A/B experiment data at `drafts/ab_perspective_shift_results.md` —
+DSPy compiled vs simple system-prompt for character modes. Verdict:
+roughly tied on quality; DSPy kept for architectural consistency.
+
 ### Known gap (as of 2026-04-17)
 
 `slo_check.MODE_CONFIG` wires only `deep_research`, `guided_learning`, `debate`.
