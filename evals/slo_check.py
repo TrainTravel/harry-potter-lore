@@ -35,6 +35,9 @@ from context_harness.metrics import (
     debate_metric,
     intent_router_metric,
     satirical_podcast_metric,
+    perspective_shift_metric,
+    exam_grader_metric,
+    open_analysis_metric,
 )
 
 # ---------------------------------------------------------------------------
@@ -72,6 +75,24 @@ MODE_CONFIG = {
         "input_field": "topic",
         "default_slo": 0.60,
     },
+    "perspective_shift": {
+        "trainset_module": "data.trainset_perspective_shift",
+        "metric": perspective_shift_metric,
+        "input_field": "scenario",
+        "default_slo": 0.60,
+    },
+    "exam_grader": {
+        "trainset_module": "data.trainset_exam_grader",
+        "metric": exam_grader_metric,
+        "input_field": "question",
+        "default_slo": 0.70,
+    },
+    "open_analysis": {
+        "trainset_module": "data.trainset_open_analysis",
+        "metric": open_analysis_metric,
+        "input_field": "question",
+        "default_slo": 0.60,
+    },
 }
 
 
@@ -104,6 +125,11 @@ def run_mode(mode: str, threshold: float, verbose: bool, agent: DSPyAgent) -> di
             kwargs["past_attempts"] = getattr(ex, "past_attempts", "none")
         elif mode == "satirical_podcast":
             kwargs["modern_angle"] = getattr(ex, "modern_angle", "")
+        elif mode == "perspective_shift":
+            kwargs["character"] = getattr(ex, "character", "albus-dumbledore")
+            kwargs["chat_history"] = getattr(ex, "chat_history", "")
+        elif mode == "exam_grader":
+            kwargs["student_answer"] = getattr(ex, "student_answer", "")
 
         # intent_router is not a DSPyAgent mode — call the router directly.
         if mode == "intent_router":

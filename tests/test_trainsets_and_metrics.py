@@ -9,6 +9,8 @@ from context_harness.metrics import (
     debate_metric, debate_score,
     satirical_podcast_metric, satirical_podcast_score,
     perspective_shift_metric,
+    open_analysis_metric,
+    exam_grader_metric,
 )
 
 
@@ -558,3 +560,181 @@ def test_perspective_shift_reflection_multi_turn_real_length():
     )
     assert perspective_shift_metric(example, reflecting_pred) is True, \
         "Reflecting response should pass — echoes user's content words"
+
+
+# ---------------------------------------------------------------------------
+# Perspective Shift — EVALSET integrity
+# ---------------------------------------------------------------------------
+
+def test_perspective_shift_evalset_nonempty():
+    from data.trainset_perspective_shift import EVALSET
+    assert len(EVALSET) >= 6
+
+
+def test_perspective_shift_evalset_examples_mark_inputs():
+    from data.trainset_perspective_shift import EVALSET
+    for ex in EVALSET:
+        keys = ex.inputs().keys()
+        assert "scenario" in keys, f"'scenario' missing from eval example: {ex.scenario!r}"
+        assert "character" in keys, f"'character' missing from eval example: {ex.scenario!r}"
+
+
+def test_perspective_shift_evalset_disjoint_from_train():
+    from data.trainset_perspective_shift import TRAINSET, EVALSET
+    train_scenarios = {ex.scenario for ex in TRAINSET}
+    eval_scenarios  = {ex.scenario for ex in EVALSET}
+    assert train_scenarios.isdisjoint(eval_scenarios)
+
+
+# ---------------------------------------------------------------------------
+# Exam Grader — EVALSET integrity
+# ---------------------------------------------------------------------------
+
+def test_exam_grader_evalset_nonempty():
+    from data.trainset_exam_grader import EVALSET
+    assert len(EVALSET) >= 6
+
+
+def test_exam_grader_evalset_has_expected_scores():
+    from data.trainset_exam_grader import EVALSET
+    for ex in EVALSET:
+        assert hasattr(ex, "expected_score"), f"missing expected_score: {ex.question!r}"
+        assert 0 <= ex.expected_score <= 100, f"score out of range: {ex.expected_score}"
+
+
+def test_exam_grader_evalset_has_passing_flag():
+    from data.trainset_exam_grader import EVALSET
+    for ex in EVALSET:
+        assert hasattr(ex, "expected_passing"), f"missing expected_passing: {ex.question!r}"
+        assert isinstance(ex.expected_passing, bool)
+
+
+def test_exam_grader_evalset_examples_mark_inputs():
+    from data.trainset_exam_grader import EVALSET
+    for ex in EVALSET:
+        keys = ex.inputs().keys()
+        assert "question" in keys
+        assert "student_answer" in keys
+
+
+def test_exam_grader_evalset_score_distribution():
+    """Confirm the eval set covers the full rubric range — not just easy/hard."""
+    from data.trainset_exam_grader import EVALSET
+    scores = [ex.expected_score for ex in EVALSET]
+    assert any(s >= 80 for s in scores), "need at least one high-score example"
+    assert any(s <= 20 for s in scores), "need at least one very-low-score example"
+    assert any(40 <= s <= 70 for s in scores), "need at least one mid-range example"
+
+
+def test_exam_grader_evalset_disjoint_from_train():
+    from data.trainset_exam_grader import TRAINSET, EVALSET
+    train_qs = {(ex.question, ex.student_answer) for ex in TRAINSET}
+    eval_qs  = {(ex.question, ex.student_answer) for ex in EVALSET}
+    assert train_qs.isdisjoint(eval_qs)
+
+
+# ---------------------------------------------------------------------------
+# exam_grader_metric
+# ---------------------------------------------------------------------------
+
+def test_exam_grader_metric_passes_on_calibrated_score():
+    ex   = SimpleNamespace(expected_score=90, expected_passing=True)
+    pred = SimpleNamespace(score=85, is_passing=True,
+                           critique="The student covered all key points about the sacrifice protection.")
+    assert exam_grader_metric(ex, pred) is True
+
+
+def test_exam_grader_metric_fails_when_score_too_far():
+    ex   = SimpleNamespace(expected_score=90, expected_passing=True)
+    pred = SimpleNamespace(score=60, is_passing=True,
+                           critique="The student covered the main idea.")
+    assert exam_grader_metric(ex, pred) is False
+
+
+def test_exam_grader_metric_fails_on_passing_disagreement():
+    ex   = SimpleNamespace(expected_score=30, expected_passing=False)
+    pred = SimpleNamespace(score=35, is_passing=True,
+                           critique="Almost correct but several errors present.")
+    assert exam_grader_metric(ex, pred) is False
+
+
+def test_exam_grader_metric_fails_on_trivial_critique():
+    ex   = SimpleNamespace(expected_score=50, expected_passing=False)
+    pred = SimpleNamespace(score=48, is_passing=False, critique="ok")
+    assert exam_grader_metric(ex, pred) is False
+
+
+# ---------------------------------------------------------------------------
+# Open Analysis — trainset integrity
+# ---------------------------------------------------------------------------
+
+def test_open_analysis_trainset_nonempty():
+    from data.trainset_open_analysis import TRAINSET
+    assert len(TRAINSET) >= 8
+
+
+def test_open_analysis_evalset_nonempty():
+    from data.trainset_open_analysis import EVALSET
+    assert len(EVALSET) >= 5
+
+
+def test_open_analysis_examples_mark_question_as_input():
+    from data.trainset_open_analysis import TRAINSET
+    for ex in TRAINSET:
+        assert "question" in ex.inputs().keys(), f"'question' not marked as input: {ex.question!r}"
+
+
+def test_open_analysis_evalset_disjoint_from_train():
+    from data.trainset_open_analysis import TRAINSET, EVALSET
+    train_qs = {ex.question for ex in TRAINSET}
+    eval_qs  = {ex.question for ex in EVALSET}
+    assert train_qs.isdisjoint(eval_qs)
+
+
+def test_open_analysis_citations_reference_valid_docs():
+    from data.trainset_open_analysis import TRAINSET, EVALSET
+    for ex in TRAINSET + EVALSET:
+        for cite in ex.citations.split():
+            assert cite in VALID_DOC_IDS, (
+                f"unknown citation {cite!r} in question: {ex.question!r}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# open_analysis_metric
+# ---------------------------------------------------------------------------
+
+def test_open_analysis_metric_passes_on_good_output():
+    pred = SimpleNamespace(
+        analysis="Snape represents one of the most carefully constructed moral ambiguities in modern fiction. His cruelty toward students is real and documented; his heroism is equally real and equally documented. The text asks us to hold both without resolution.",
+        corpus_facts="Snape served as a double agent for Dumbledore, motivated by his love for Lily Potter.",
+        own_reasoning="This maps to real-world psychological studies on compartmentalisation under long-term stress.",
+    )
+    assert open_analysis_metric(None, pred) is True
+
+
+def test_open_analysis_metric_fails_on_short_analysis():
+    pred = SimpleNamespace(
+        analysis="Snape is complex.",
+        corpus_facts="Snape was a Death Eater and a double agent.",
+        own_reasoning="This maps to compartmentalisation under stress.",
+    )
+    assert open_analysis_metric(None, pred) is False
+
+
+def test_open_analysis_metric_fails_on_missing_own_reasoning():
+    pred = SimpleNamespace(
+        analysis="A" * 110,
+        corpus_facts="Snape served as a double agent for Dumbledore throughout the series.",
+        own_reasoning="ok",
+    )
+    assert open_analysis_metric(None, pred) is False
+
+
+def test_open_analysis_metric_fails_on_missing_corpus_facts():
+    pred = SimpleNamespace(
+        analysis="A" * 110,
+        corpus_facts="yes",
+        own_reasoning="This maps to real-world psychology of compartmentalisation and moral injury.",
+    )
+    assert open_analysis_metric(None, pred) is False

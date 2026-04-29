@@ -109,3 +109,74 @@ TRAINSET = [
         expected_passing=False,
     ).with_inputs("question", "student_answer"),
 ]
+
+
+# ---------------------------------------------------------------------------
+# Held-out evaluation set — do NOT use in BootstrapFewShot.compile
+# ---------------------------------------------------------------------------
+
+EVALSET = [
+    # Excellent — full explanation with mechanism
+    dspy.Example(
+        question="How did Lily Potter's sacrifice protect Harry from Voldemort's killing curse?",
+        student_answer="Lily Potter chose to die rather than step aside, and that act of willing self-sacrifice created an ancient protective enchantment rooted in love. When Voldemort cast Avada Kedavra, the curse rebounded because of this protection. The magic lived in Harry's blood, which is why Voldemort's use of Harry's blood in his resurrection ritual paradoxically kept that protection alive.",
+        expected_score=93,
+        expected_passing=True,
+    ).with_inputs("question", "student_answer"),
+
+    # Good — correct but misses the blood-resurrection detail
+    dspy.Example(
+        question="What was Snape's true allegiance throughout the series?",
+        student_answer="Snape was secretly loyal to Dumbledore, acting as a double agent inside Voldemort's Death Eaters. His underlying motivation was his love for Lily Potter, Harry's mother. He protected Harry throughout his time at Hogwarts and revealed crucial information about Horcruxes before he died.",
+        expected_score=85,
+        expected_passing=True,
+    ).with_inputs("question", "student_answer"),
+
+    # Passing but weak — correct facts, no depth
+    dspy.Example(
+        question="Who is Ron Weasley and what is his background?",
+        student_answer="Ron Weasley is Harry Potter's best friend. He comes from a large wizarding family that doesn't have much money. He's very loyal and brave.",
+        expected_score=62,
+        expected_passing=True,
+    ).with_inputs("question", "student_answer"),
+
+    # Partially correct — right topic, misses half the Horcruxes
+    dspy.Example(
+        question="Name all of Voldemort's Horcruxes.",
+        student_answer="Voldemort made his diary, Marvolo Gaunt's ring, Slytherin's locket, and Hufflepuff's cup into Horcruxes. I think there were a couple more but I can't remember them.",
+        expected_score=48,
+        expected_passing=False,
+    ).with_inputs("question", "student_answer"),
+
+    # Partially correct — right topic but skips founding context
+    dspy.Example(
+        question="Describe the founding and purpose of the Order of the Phoenix.",
+        student_answer="The Order of the Phoenix was a secret organisation that fought against Voldemort. It included wizards like Mad-Eye Moody and Lupin.",
+        expected_score=50,
+        expected_passing=False,
+    ).with_inputs("question", "student_answer"),
+
+    # Wrong — fabricated founder
+    dspy.Example(
+        question="Who founded the Order of the Phoenix?",
+        student_answer="The Order of the Phoenix was founded by Harry Potter and Hermione Granger in their sixth year at Hogwarts to fight Voldemort's Death Eaters.",
+        expected_score=5,
+        expected_passing=False,
+    ).with_inputs("question", "student_answer"),
+
+    # Wrong — reverses canon fact
+    dspy.Example(
+        question="What is Hermione Granger known for academically?",
+        student_answer="Hermione Granger was actually an average student who succeeded mainly through hard work and close friendship with Harry, not through any particular natural ability or intelligence.",
+        expected_score=12,
+        expected_passing=False,
+    ).with_inputs("question", "student_answer"),
+
+    # Correct but under-detailed (Deathly Hallows summary)
+    dspy.Example(
+        question="What are the Deathly Hallows and who created them according to legend?",
+        student_answer="The Deathly Hallows are three magical objects: a wand, a stone, and a cloak. According to the legend, Death himself gave them to three brothers.",
+        expected_score=68,
+        expected_passing=True,
+    ).with_inputs("question", "student_answer"),
+]
