@@ -34,7 +34,7 @@ def pipeline():
 @pytest.fixture(autouse=True)
 def dummy_lm():
     """Configure DummyLM before every test and restore afterwards."""
-    _answer = {
+    lm = DummyLM(answers=[{
         "answer": "Harry Potter defeated Voldemort.",
         "citations": "harry-potter lord-voldemort",
         "confidence": "high",
@@ -47,10 +47,7 @@ def dummy_lm():
         "analysis": "Blended analysis drawing from canon and interpretation.",
         "corpus_facts": "Key corpus facts.",
         "own_reasoning": "Extended interpretation beyond the corpus.",
-        # QueryPlanSignature (MultiToolDeepResearchModule makes 2 LLM calls)
-        "tool_calls": '[{"tool": "vector_search", "args": {"query": "test", "k": 5}}]',
-    }
-    lm = DummyLM(answers=[_answer] * 20)
+    }])
     dspy.configure(lm=lm)
     yield lm
 

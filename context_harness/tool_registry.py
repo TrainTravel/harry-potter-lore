@@ -231,27 +231,6 @@ class ToolRegistry:
         })
         return result
 
-    def call_sync(self, name: str, args: Dict[str, Any]) -> Any:
-        """Validate args and call a synchronous tool. Raises if the tool is async."""
-        if name not in self._tools:
-            raise ToolNotFoundError(
-                f"Unknown tool '{name}'. Available: {list(self._tools.keys())}"
-            )
-        tool = self._tools[name]
-        self._validator.validate(args, tool.schema)
-        if tool.is_async:
-            raise RuntimeError(
-                f"Tool '{name}' is async; use 'await registry.call()' instead."
-            )
-        start = time.perf_counter()
-        result = tool.fn(**args)
-        latency_ms = (time.perf_counter() - start) * 1000
-        self._call_log.append({
-            "tool": name, "args": args,
-            "latency_ms": round(latency_ms, 2), "ts": time.time(),
-        })
-        return result
-
     def to_openai_functions(self) -> List[dict]:
         """Return a list of OpenAI-compatible function schemas for all tools."""
         return [t.schema.to_openai_function() for t in self._tools.values()]

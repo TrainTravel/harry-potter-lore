@@ -51,7 +51,6 @@ import dspy
 
 from .intent_router import IntentRouterModule, parse_router_output
 from .rag_pipeline import RAGPipeline
-from .retrieval_tools import build_retrieval_registry
 
 
 # ---------------------------------------------------------------------------
@@ -69,26 +68,6 @@ class DeepResearchSignature(dspy.Signature):
     citations:  str = dspy.OutputField(desc="space-separated doc_ids referenced in the answer")
     confidence: str = dspy.OutputField(desc="one of: low / medium / high")
     gaps:       str = dspy.OutputField(desc="aspects the context does not cover, or 'none'")
-
-
-class QueryPlanSignature(dspy.Signature):
-    """Break a complex HP lore question into 2-3 targeted retrieval sub-queries.
-    Output a JSON array of tool calls. Available tools:
-      - vector_search(query: str, k: int 1-15) — broad semantic search
-      - character_search(character: str, query: str, k: int 1-10) — scoped to a character slug
-      - topic_search(topic: str, query: str, k: int 1-10) — topic-prefixed search
-    Use character_search when a specific character is central.
-    Use topic_search for artefacts, institutions, or events.
-    Use vector_search for general or cross-cutting questions."""
-
-    question: str = dspy.InputField(desc="the HP lore research question to plan retrieval for")
-    tool_calls: str = dspy.OutputField(
-        desc=(
-            'JSON array of 2-3 tool calls, e.g.: '
-            '[{"tool": "topic_search", "args": {"topic": "Deathly Hallows", "query": "Elder Wand masters", "k": 5}}, '
-            '{"tool": "character_search", "args": {"character": "albus-dumbledore", "query": "Elder Wand", "k": 4}}]'
-        )
-    )
 
 
 class PerspectiveShiftSignature(dspy.Signature):
@@ -274,96 +253,6 @@ class DeepResearchModule(dspy.Module):
         chunks = self._pipeline.retrieve(question, top_k=self._k)
         context = "\n\n".join(f"[{c.doc_id}] {c.text}" for c in chunks) or "No context retrieved."
         return self.predict(question=question, context=context)
-
-
-_MAX_MERGED_CHUNKS = 15   # cap total chunks fed to the synthesiser
-
-
-def _parse_tool_calls(raw: str) -> list:
-    """
-    Extract a JSON array of tool calls from the LLM output.
-    Handles three common failure modes:
-      1. Clean JSON array — parsed directly.
-      2. JSON wrapped in ```json ... ``` fences — fences stripped first.
-      3. Unparseable string — returns empty list (caller falls back to vector_search).
-    """
-    import json, re
-    text = raw.strip()
-    # Strip ```json ... ``` fences
-    fenced = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
-    if fenced:
-        text = fenced.group(1).strip()
-    # Find the first [...] array in the string
-    array_match = re.search(r"\[[\s\S]*\]", text)
-    if array_match:
-        try:
-            return json.loads(array_match.group())
-        except json.JSONDecodeError:
-            pass
-    return []
-
-
-def _dedup_chunks(chunk_lists: list) -> list:
-    """Merge multiple lists of chunk dicts, deduplicating by (doc_id, text[:60])."""
-    seen: set = set()
-    merged: list = []
-    for chunks in chunk_lists:
-        for c in chunks:
-            key = (c["doc_id"], c["text"][:60])
-            if key not in seen:
-                seen.add(key)
-                merged.append(c)
-    return merged[:_MAX_MERGED_CHUNKS]
-
-
-class MultiToolDeepResearchModule(dspy.Module):
-    """
-    Two-step deep research:
-      1. QueryPlanSignature — LLM plans 2-3 targeted tool calls.
-      2. Execute plan via ToolRegistry (validated, logged).
-      3. DeepResearchSignature — synthesise merged context into answer.
-
-    Falls back to single vector_search if the plan cannot be parsed.
-    """
-
-    def __init__(self, pipeline: RAGPipeline, char_pipeline=None) -> None:
-        super().__init__()
-        self._registry = build_retrieval_registry(pipeline, char_pipeline=char_pipeline)
-        self._plan = dspy.ChainOfThought(QueryPlanSignature)
-        self._synthesise = dspy.ChainOfThought(DeepResearchSignature)
-
-    def forward(self, question: str, **kwargs) -> dspy.Prediction:
-        # Step 1: plan
-        plan_pred = self._plan(question=question)
-        tool_calls = _parse_tool_calls(plan_pred.tool_calls)
-
-        # Step 2: execute; fall back to vector_search if plan is empty/invalid
-        if not tool_calls:
-            tool_calls = [{"tool": "vector_search", "args": {"query": question, "k": 10}}]
-
-        chunk_lists = []
-        for call in tool_calls[:3]:  # max 3 calls
-            name = call.get("tool", "vector_search")
-            args = call.get("args", {})
-            # Ensure k is an int and within bounds
-            if "k" in args:
-                args["k"] = max(1, min(int(args["k"]), 15))
-            try:
-                result = self._registry.call_sync(name, args)
-                chunk_lists.append(result)
-            except Exception:
-                # Bad tool call — skip, don't crash the whole request
-                pass
-
-        if not chunk_lists:
-            # All calls failed — last-resort fallback
-            fallback = self._registry.call_sync("vector_search", {"query": question, "k": 10})
-            chunk_lists.append(fallback)
-
-        # Step 3: synthesise
-        chunks = _dedup_chunks(chunk_lists)
-        context = "\n\n".join(f"[{c['doc_id']}] {c['text']}" for c in chunks) or "No context retrieved."
-        return self._synthesise(question=question, context=context)
 
 
 _CHARACTER_SLUG: Dict[str, str] = {
@@ -663,7 +552,7 @@ class DSPyAgent:
         self._char_pipeline = char_pipeline
 
         self._modules: Dict[str, dspy.Module] = {
-            "deep_research":   MultiToolDeepResearchModule(pipeline, char_pipeline=char_pipeline),
+            "deep_research":   DeepResearchModule(pipeline, k=research_k),
             "guided_learning": GuidedLearningModule(pipeline, k=learning_k),
             "exam_grader":     ExamGraderModule(pipeline, k=5),
             "open_analysis":   OpenAnalysisModule(
@@ -789,7 +678,7 @@ class DSPyAgent:
     # ------------------------------------------------------------------
 
     def compile_deep_research(self, optimizer: dspy.teleprompt.Teleprompter, trainset: list) -> None:
-        """Run the optimizer on the deep_research (multi-tool) module and update in place."""
+        """Run the optimizer on the deep_research module and update in place."""
         self._modules["deep_research"] = optimizer.compile(
             self._modules["deep_research"], trainset=trainset
         )
@@ -870,20 +759,12 @@ def _primary_input_field(module: dspy.Module) -> str:
     """
     Return the first non-`context` input field name from the module's Signature.
 
-    Single-predictor modules (all standard modes) expose a `predict` attribute
-    (a ChainOfThought). Multi-predictor modules (MultiToolDeepResearchModule)
-    don't have a single `predict` — fall back to the first Predict found via
-    module.predictors(), which returns all inner Predict instances in order.
+    This is the canonical "user-facing" input — what the caller's positional
+    `text` argument maps to. Enforces the Signature-is-canonical rule: no
+    per-mode dispatch table, no aliasing — the Signature itself tells the
+    router where to put the text.
     """
-    if hasattr(module, 'predict'):
-        sig = module.predict.predictors()[0].signature
-    else:
-        preds = module.predictors()
-        if not preds:
-            raise RuntimeError(
-                f"Signature for {type(module).__name__} has no predictors"
-            )
-        sig = preds[0].signature
+    sig = module.predict.predictors()[0].signature
     for name in sig.input_fields:
         if name != "context":
             return name

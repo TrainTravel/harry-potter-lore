@@ -86,8 +86,6 @@ _DUMMY_ANSWER = {
     "kwargs_json": "{}",
     # reasoning trace (DSPy ChainOfThought always emits this)
     "reasoning": "Step-by-step reasoning trace.",
-    # QueryPlanSignature (MultiToolDeepResearchModule)
-    "tool_calls": '[{"tool": "vector_search", "args": {"query": "test", "k": 5}}]',
 }
 
 
