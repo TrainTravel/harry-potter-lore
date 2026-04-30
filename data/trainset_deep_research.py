@@ -179,4 +179,23 @@ EVALSET = [
         citations="hermione-granger",
         confidence="high",
     ).with_inputs("question"),
+
+    # Multi-hop — require evidence from two distinct parts of the corpus
+    dspy.Example(
+        question="Trace the Elder Wand's ownership from Grindelwald to Harry Potter, explaining each transfer.",
+        citations="deathly-hallows albus-dumbledore lord-voldemort harry-potter",
+        confidence="high",
+    ).with_inputs("question"),
+
+    dspy.Example(
+        question="How did Voldemort's use of Harry's blood in his resurrection ritual paradoxically protect Harry?",
+        citations="lord-voldemort harry-potter horcruxes",
+        confidence="high",
+    ).with_inputs("question"),
+
+    dspy.Example(
+        question="Explain the chain of events that led Snape to kill Dumbledore and why Dumbledore trusted him throughout.",
+        citations="severus-snape albus-dumbledore order-of-the-phoenix",
+        confidence="high",
+    ).with_inputs("question"),
 ]

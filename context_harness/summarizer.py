@@ -25,9 +25,12 @@ import hashlib
 import json
 import sqlite3
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Callable, Coroutine, List, Optional
+
+import dspy
 
 from .context_manager import ContextEntry, ContextRole, ContextWindow
 
@@ -39,10 +42,40 @@ from .context_manager import ContextEntry, ContextRole, ContextWindow
 SummariseFn = Callable[[List[ContextEntry]], Coroutine[None, None, str]]
 
 
-async def _stub_summarise(entries: List[ContextEntry]) -> str:
-    """Stub: concatenate content. Replace with a real LLM call in production."""
-    texts = [e.content for e in entries]
-    return "Summary: " + " | ".join(t[:80] for t in texts)
+# ---------------------------------------------------------------------------
+# DSPy-backed summarisation (runs in a thread so it doesn't block the loop)
+# ---------------------------------------------------------------------------
+
+class _SummariseSignature(dspy.Signature):
+    """Compress a multi-turn conversation history into a concise 2-3 sentence
+    summary that preserves the key facts and conclusions reached."""
+
+    history: str = dspy.InputField(desc="conversation turns to compress")
+    summary: str = dspy.OutputField(desc="2-3 sentence factual summary")
+
+
+_summarise_predict = dspy.Predict(_SummariseSignature)
+_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="summarizer")
+
+
+def _summarise_sync(text: str) -> str:
+    """Call the DSPy LLM synchronously (runs inside a thread executor)."""
+    try:
+        pred = _summarise_predict(history=text)
+        return pred.summary
+    except Exception:
+        # LLM unavailable or not configured — return a safe truncated fallback
+        lines = text.split("\n")
+        return "Summary: " + " | ".join(l[:80] for l in lines[:3] if l.strip())
+
+
+async def _gemini_summarise(entries: List[ContextEntry]) -> str:
+    """Non-blocking summariser: runs DSPy Predict in a thread executor."""
+    text = "\n".join(
+        f"[{e.role}]: {e.content[:400]}" for e in entries
+    )
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(_executor, _summarise_sync, text)
 
 
 # ---------------------------------------------------------------------------
@@ -121,7 +154,7 @@ class SummarizationQueue:
 
     def __init__(
         self,
-        llm_fn: SummariseFn = _stub_summarise,
+        llm_fn: SummariseFn = _gemini_summarise,
         store: Optional[SummaryStore] = None,
         max_queue_size: int = 64,
     ) -> None:
