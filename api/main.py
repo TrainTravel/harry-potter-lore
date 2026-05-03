@@ -679,3 +679,61 @@ def trace(turn_id: str) -> dict[str, Any]:
     if events is None:
         raise HTTPException(404, f"no trace for {turn_id}")
     return {"turn_id": turn_id, "event_count": len(events), "events": events}
+
+
+# ---------------------------------------------------------------------------
+# Temporal workflow endpoints
+# ---------------------------------------------------------------------------
+# These require a Temporal server (TEMPORAL_HOST env var, default localhost:7233)
+# and a running worker (python -m temporal.worker).
+# If Temporal is not configured or unreachable, both endpoints return 503.
+
+class WorkflowRequest(BaseModel):
+    question: str
+    collection_name: str = "hp_lore"
+    conversation_id: str | None = None
+
+
+class WorkflowSubmitResponse(BaseModel):
+    workflow_id: str
+    status_url: str
+
+
+@app.post("/workflow/research", response_model=WorkflowSubmitResponse)
+async def submit_research_workflow(req: WorkflowRequest) -> WorkflowSubmitResponse:
+    """Submit a MultiToolResearchWorkflow to Temporal. Returns immediately with a workflow_id.
+    Poll GET /workflow/{workflow_id} to retrieve the result once complete."""
+    try:
+        from temporal.client import submit_research
+        wf_id = await submit_research(
+            question=req.question,
+            collection_name=req.collection_name,
+            conversation_id=req.conversation_id,
+        )
+    except Exception as exc:
+        raise HTTPException(503, f"Temporal unavailable: {exc}") from exc
+    return WorkflowSubmitResponse(
+        workflow_id=wf_id,
+        status_url=f"/workflow/{wf_id}",
+    )
+
+
+@app.get("/workflow/{workflow_id}")
+async def get_workflow_result(workflow_id: str) -> dict[str, Any]:
+    """Poll for a workflow result. Returns 202 while pending, 200 with result when done."""
+    try:
+        from temporalio.client import Client, WorkflowExecutionStatus
+        from temporal.client import get_temporal_client
+        client = await get_temporal_client()
+        handle = client.get_workflow_handle(workflow_id)
+        desc = await handle.describe()
+    except Exception as exc:
+        raise HTTPException(503, f"Temporal unavailable: {exc}") from exc
+
+    status = desc.status
+    if status == WorkflowExecutionStatus.RUNNING:
+        return {"workflow_id": workflow_id, "status": "running"}
+    if status == WorkflowExecutionStatus.COMPLETED:
+        result = await handle.result()
+        return {"workflow_id": workflow_id, "status": "completed", "result": result}
+    return {"workflow_id": workflow_id, "status": status.name.lower()}
