@@ -25,9 +25,16 @@ from context_harness.conversation import (
     DEFAULT_COMPACTION_THRESHOLD,
     DEFAULT_KEEP_RECENT,
 )
-from context_harness.dspy_agent import DSPyAgent, QueryPlanSignature, DeepResearchSignature, _parse_tool_calls
+from context_harness.dspy_agent import DSPyAgent
 from context_harness.rag_pipeline import RAGPipeline
-from context_harness.retrieval_tools import build_retrieval_registry
+
+# QueryPlanSignature, DeepResearchSignature, _parse_tool_calls, and
+# build_retrieval_registry are imported lazily inside the activities that need
+# them. dspy_agent.py has several transitive imports (ChromaDB, onnxruntime,
+# huggingface-hub) that may fail in minimal CI environments. A module-level
+# import of names defined *after* those imports would surface as
+# "cannot import name X" even though X exists in the source file. Lazy
+# imports confine the failure to the specific activity call, not collection.
 
 
 @dataclass
@@ -87,6 +94,7 @@ async def route_intent(question: str) -> dict:
 @activity.defn
 async def plan_tool_calls(question: str) -> list[dict]:
     """Call QueryPlanSignature to get 2-3 targeted tool calls for a question."""
+    from context_harness.dspy_agent import QueryPlanSignature, _parse_tool_calls
     deps = _get_deps()
     planner = dspy.ChainOfThought(QueryPlanSignature)
 
@@ -101,6 +109,7 @@ async def plan_tool_calls(question: str) -> list[dict]:
 @activity.defn
 async def execute_tool_call(tool_name: str, args: dict, collection: str) -> list[dict]:
     """Execute one tool call via the ToolRegistry and return chunk dicts."""
+    from context_harness.retrieval_tools import build_retrieval_registry
     deps = _get_deps()
     registry = build_retrieval_registry(deps.pipeline)
     if "k" in args:
@@ -116,6 +125,7 @@ async def execute_tool_call(tool_name: str, args: dict, collection: str) -> list
 @activity.defn
 async def synthesise_research(question: str, context: str) -> dict:
     """Run DeepResearchSignature over merged context. Returns answer dict."""
+    from context_harness.dspy_agent import DeepResearchSignature
     deps = _get_deps()
     synthesiser = dspy.ChainOfThought(DeepResearchSignature)
 

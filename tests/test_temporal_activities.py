@@ -139,7 +139,7 @@ class TestRouteIntent:
 
 class TestExecuteToolCall:
     async def test_delegates_to_registry(self):
-        with patch("temporal.activities.build_retrieval_registry") as mock_reg:
+        with patch("context_harness.retrieval_tools.build_retrieval_registry") as mock_reg:
             registry = MagicMock()
             registry.call_sync.return_value = [{"doc_id": "x", "text": "passage"}]
             mock_reg.return_value = registry
@@ -147,7 +147,7 @@ class TestExecuteToolCall:
         assert result[0]["doc_id"] == "x"
 
     async def test_k_clamped_above_max(self):
-        with patch("temporal.activities.build_retrieval_registry") as mock_reg:
+        with patch("context_harness.retrieval_tools.build_retrieval_registry") as mock_reg:
             registry = MagicMock()
             registry.call_sync.return_value = []
             mock_reg.return_value = registry
@@ -157,7 +157,7 @@ class TestExecuteToolCall:
             assert passed_args["k"] == 15
 
     async def test_k_clamped_below_min(self):
-        with patch("temporal.activities.build_retrieval_registry") as mock_reg:
+        with patch("context_harness.retrieval_tools.build_retrieval_registry") as mock_reg:
             registry = MagicMock()
             registry.call_sync.return_value = []
             mock_reg.return_value = registry
