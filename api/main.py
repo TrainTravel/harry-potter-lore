@@ -243,6 +243,12 @@ class AskResponse(BaseModel):
     # Intent router metadata — populated when mode="auto"
     routed_mode: str | None = None
     router_confidence: str | None = None
+    # The mode actually dispatched after stickiness arbitration. Differs
+    # from routed_mode when an off-topic continuation gets sticky-bound
+    # back to the prior mode. The UI keys badges + off-topic header off
+    # this so the rendered chrome matches the response's actual voice.
+    # routed_mode stays available for debug/telemetry.
+    effective_mode: str | None = None
     # Interactive follow-up options. When present, the UI renders them as
     # clickable chips below the message. Used by the perspective_shift
     # disambiguation branch (no character set → ask which voice) and by
@@ -500,6 +506,7 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
             gaps="",
             routed_mode=routed_mode or "perspective_shift",
             router_confidence=router_confidence,
+            effective_mode="perspective_shift",
             options=[
                 "albus-dumbledore",
                 "hermione-granger",
@@ -718,6 +725,7 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
         gaps=(getattr(pred, "gaps", "") or ""),
         routed_mode=routed_mode,
         router_confidence=router_confidence,
+        effective_mode=effective_mode,
     )
 
 
