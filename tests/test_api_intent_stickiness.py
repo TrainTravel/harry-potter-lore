@@ -154,6 +154,13 @@ def test_auto_mode_continuation_sticks_when_router_says_off_topic(client, monkey
     assert r2.status_code == 200
     body2 = r2.json()
     assert body2["routed_mode"] == "none", "router still emits its raw classification"
+    # The response surfaces effective_mode so the UI can render the
+    # right badge — stickiness routed to open_analysis even though the
+    # raw signal was off-topic.
+    assert body2["effective_mode"] == "open_analysis", (
+        "effective_mode must reflect the sticky dispatch, not the raw router "
+        "signal — UI keys badges + off-topic header off this field"
+    )
 
     # The router.decision trace event records the actual dispatch decision
     decision = _events_of_kind(body2["turn_id"], "router.decision")[0]["attrs"]
