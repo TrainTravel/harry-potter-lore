@@ -271,3 +271,61 @@ def test_explicit_mode_skips_stickiness(client, monkeypatch):
     body = r.json()
     # No router.decision event when mode is explicit
     assert len(_events_of_kind(body["turn_id"], "router.decision")) == 0
+
+
+def test_perspective_shift_no_character_returns_options(client, monkeypatch):
+    """Auto-routed perspective_shift with no character → options branch.
+
+    Returns clickable character slugs instead of silently defaulting to
+    Dumbledore. The LLM is never called (cost=0, no character_response).
+    """
+    _patch_route_only(monkeypatch, mode="perspective_shift", confidence="high")
+
+    # No `character` field in the body (and no explicit empty string either)
+    r = client.post("/ask", json={
+        "question": "How do I deal with imposter syndrome?",
+        "mode": "auto",
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert body["routed_mode"] == "perspective_shift"
+    assert body["options"] is not None
+    assert len(body["options"]) == 9
+    assert "albus-dumbledore" in body["options"]
+    assert "sirius-black" in body["options"]
+    assert body["cost_usd"] == 0.0
+    # Trace: disambiguation event fired
+    assert len(_events_of_kind(body["turn_id"], "perspective.disambiguation")) == 1
+
+
+def test_perspective_shift_with_character_skips_disambiguation(client, monkeypatch):
+    """When client sends a character, disambiguation is bypassed and the
+    LLM runs normally."""
+    _patch_route_only(monkeypatch, mode="perspective_shift", confidence="high")
+
+    r = client.post("/ask", json={
+        "question": "How do I deal with imposter syndrome?",
+        "mode": "auto",
+        "character": "luna-lovegood",
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert body["routed_mode"] == "perspective_shift"
+    # No options — normal LLM flow ran
+    assert body["options"] is None
+    # No disambiguation event
+    assert len(_events_of_kind(body["turn_id"], "perspective.disambiguation")) == 0
+
+
+def test_explicit_perspective_shift_no_character_returns_options(client):
+    """Even when the client pins mode=perspective_shift explicitly (no
+    router involved), missing character still triggers the options branch."""
+    r = client.post("/ask", json={
+        "question": "How do I deal with imposter syndrome?",
+        "mode": "perspective_shift",
+        # character omitted
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert body["options"] is not None
+    assert len(body["options"]) == 9

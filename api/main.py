@@ -190,7 +190,12 @@ def _record(turn_id: str, name: str, attrs: dict[str, Any] | None = None) -> Non
 class AskRequest(BaseModel):
     question: str
     mode: str = Field(default="deep_research", pattern="^(deep_research|guided_learning|exam_grader|open_analysis|perspective_shift|debate|satirical_podcast|auto)$")
-    character: str = Field(default="Dumbledore", description="HP character for perspective_shift mode")
+    # Empty string ("") = no character set. When the dispatch lands on
+    # perspective_shift with no character, the API short-circuits and
+    # returns clickable character options instead of silently defaulting
+    # to Dumbledore (which used to mismatch the named character in the
+    # question prose). Send a non-empty slug or display name to bypass.
+    character: str = Field(default="", description="HP character for perspective_shift mode (empty = unset)")
     collection_name: str = "hp_lore"
     provider: str = "gemini"
     api_key: str | None = None
@@ -238,6 +243,11 @@ class AskResponse(BaseModel):
     # Intent router metadata — populated when mode="auto"
     routed_mode: str | None = None
     router_confidence: str | None = None
+    # Interactive follow-up options. When present, the UI renders them as
+    # clickable chips below the message. Used by the perspective_shift
+    # disambiguation branch (no character set → ask which voice) and by
+    # the Sorting Hat quiz flow.
+    options: list[str] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -456,14 +466,52 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
             "source": decision_source,
         })
 
-        # Inherit prior character on sticky perspective_shift continuation,
-        # but only when the client sent the default (Dumbledore). Explicit
-        # non-default picks are always respected.
+        # Inherit prior character on sticky perspective_shift continuation
+        # when the current request didn't pin one. Explicit picks are always
+        # respected. Treat the legacy "Dumbledore" default as unset too, so
+        # older clients still benefit from stickiness.
         if (dispatch_mode == "perspective_shift"
                 and prior_character
-                and dispatch_character == "Dumbledore"
+                and (not (dispatch_character or "").strip()
+                     or dispatch_character == "Dumbledore")
                 and prior_character != "Dumbledore"):
             dispatch_character = prior_character
+
+    # Perspective-shift disambiguation: when the dispatch lands on
+    # perspective_shift but no character is set, return clickable character
+    # options instead of silently defaulting. Avoids a 0-token roundtrip
+    # against the LLM and lets the UI render avatar chips. The user clicks
+    # one and the request is resent with the chosen slug.
+    if (dispatch_mode == "perspective_shift"
+            and not (dispatch_character or "").strip()):
+        _record(turn_id, "perspective.disambiguation", {
+            "routed_mode": routed_mode,
+            "router_confidence": router_confidence,
+        })
+        return AskResponse(
+            turn_id=turn_id,
+            answer=(
+                "Whose perspective would you like? "
+                "Pick a character below."
+            ),
+            citations=[],
+            cost_usd=0.0,
+            latency_ms=(time.perf_counter() - t_llm) * 1000,
+            gaps="",
+            routed_mode=routed_mode or "perspective_shift",
+            router_confidence=router_confidence,
+            options=[
+                "albus-dumbledore",
+                "hermione-granger",
+                "harry-potter",
+                "ron-weasley",
+                "luna-lovegood",
+                "minerva-mcgonagall",
+                "severus-snape",
+                "rubeus-hagrid",
+                "sirius-black",
+            ],
+        )
 
     # Off-topic short-circuit: skip mode dispatch, return capability text.
     if dispatch_mode == "none" or dispatch_mode is None:
