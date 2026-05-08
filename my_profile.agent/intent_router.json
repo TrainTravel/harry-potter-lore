@@ -4,52 +4,92 @@
     "train": [],
     "demos": [
       {
-        "augmented": true,
-        "user_message": "What are the properties of the Elder Wand?",
-        "reasoning": "The user is asking a factual question about a specific object in Harry Potter lore. This falls under the `deep_research` mode. No specific parameters are needed.",
+        "user_message": "Mark this answer: Q: Name three Unforgivable Curses. A: Avada Kedavra, Crucio, and Expelliarmus.",
+        "mode": "exam_grader",
+        "kwargs_json": "{\"student_answer\": \"Avada Kedavra, Crucio, and Expelliarmus.\"}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "Give me a pep talk as McGonagall",
+        "mode": "perspective_shift",
+        "kwargs_json": "{\"character\": \"McGonagall\"}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "What would Dumbledore say about my career change?",
+        "mode": "perspective_shift",
+        "kwargs_json": "{\"character\": \"Dumbledore\"}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "Podcast: wizarding dating apps",
+        "mode": "satirical_podcast",
+        "kwargs_json": "{\"modern_angle\": \"dating apps\"}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "Snape",
         "mode": "deep_research",
+        "kwargs_json": "{}",
+        "confidence": "low"
+      },
+      {
+        "user_message": "What's the capital of France?",
+        "mode": "none",
         "kwargs_json": "{}",
         "confidence": "high"
       },
       {
-        "augmented": true,
-        "user_message": "Tell me about the Battle of Hogwarts",
-        "reasoning": "The user is asking for factual information about a specific event in Harry Potter lore. This falls under the `deep_research` mode.",
-        "mode": "deep_research",
-        "kwargs_json": "{}",
-        "confidence": "high"
-      },
-      {
-        "augmented": true,
-        "user_message": "What spells did Voldemort use?",
-        "reasoning": "The user is asking for factual information about spells used by a specific character in the Harry Potter universe. This falls under the \"deep_research\" category as it requires retrieving specific details about lore.",
-        "mode": "deep_research",
-        "kwargs_json": "{}",
-        "confidence": "high"
-      },
-      {
-        "augmented": true,
-        "user_message": "Who were the original members of the Order of the Phoenix?",
-        "reasoning": "The user is asking a factual question about Harry Potter lore, specifically about the original members of the Order of the Phoenix. This falls under the `deep_research` mode.",
-        "mode": "deep_research",
-        "kwargs_json": "{}",
-        "confidence": "high"
-      },
-      {
-        "user_message": "What do you think about Dumbledore?",
-        "mode": "open_analysis",
-        "kwargs_json": "{}",
-        "confidence": "medium"
-      },
-      {
-        "user_message": "Quiz me on the Deathly Hallows",
+        "user_message": "Can you walk me through Dumbledore's plan step by step?",
         "mode": "guided_learning",
         "kwargs_json": "{}",
         "confidence": "high"
       },
       {
-        "user_message": "Why did Snape become the person he became?",
-        "mode": "open_analysis",
+        "user_message": "I want to study the history of Hogwarts houses",
+        "mode": "guided_learning",
+        "kwargs_json": "{}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "What's the weather like today?",
+        "mode": "none",
+        "kwargs_json": "{}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "Solve this equation: 2x + 3 = 7",
+        "mode": "none",
+        "kwargs_json": "{}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "My best friend and I are drifting apart — what do I do?",
+        "mode": "perspective_shift",
+        "kwargs_json": "{}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "Tell me about the Lord of the Rings",
+        "mode": "none",
+        "kwargs_json": "{}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "Argue both sides: were the Deathly Hallows more dangerous than Horcruxes?",
+        "mode": "debate",
+        "kwargs_json": "{}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "I keep procrastinating on the work that actually matters",
+        "mode": "perspective_shift",
+        "kwargs_json": "{}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "Tell me about the Battle of Hogwarts",
+        "mode": "deep_research",
         "kwargs_json": "{}",
         "confidence": "high"
       },

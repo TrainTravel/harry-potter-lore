@@ -216,6 +216,54 @@ TRAINSET = [
         confidence="high",
     ).with_inputs("user_message"),
 
+    # Character-less life advice. The user describes a personal situation
+    # without naming an HP character. The router must still route to
+    # perspective_shift (kwargs empty); the API short-circuits with
+    # character options so the user picks. Without these examples the
+    # router classifies bare life advice as "none" (off-topic) because
+    # it has no HP keyword to anchor on.
+    dspy.Example(
+        user_message="i love someone but they don't actively reply to my messages",
+        mode="perspective_shift",
+        kwargs_json="{}",
+        confidence="high",
+    ).with_inputs("user_message"),
+
+    dspy.Example(
+        user_message="How do I deal with imposter syndrome at a new job?",
+        mode="perspective_shift",
+        kwargs_json="{}",
+        confidence="high",
+    ).with_inputs("user_message"),
+
+    dspy.Example(
+        user_message="My best friend and I are drifting apart — what do I do?",
+        mode="perspective_shift",
+        kwargs_json="{}",
+        confidence="high",
+    ).with_inputs("user_message"),
+
+    dspy.Example(
+        user_message="I'm afraid of disappointing my family with my career choices",
+        mode="perspective_shift",
+        kwargs_json="{}",
+        confidence="high",
+    ).with_inputs("user_message"),
+
+    dspy.Example(
+        user_message="I'm stuck between a safe job and a creative path I love",
+        mode="perspective_shift",
+        kwargs_json="{}",
+        confidence="high",
+    ).with_inputs("user_message"),
+
+    dspy.Example(
+        user_message="I keep procrastinating on the work that actually matters",
+        mode="perspective_shift",
+        kwargs_json="{}",
+        confidence="high",
+    ).with_inputs("user_message"),
+
     # --- debate (5 examples) ---
     dspy.Example(
         user_message="Was Snape really a hero?",
@@ -464,6 +512,21 @@ EVALSET = [
         user_message="Talk to me as if you were Hagrid dealing with a layoff",
         mode="perspective_shift",
         kwargs_json='{"character": "Hagrid"}',
+        confidence="high",
+    ).with_inputs("user_message"),
+
+    # Character-less life advice (held-out)
+    dspy.Example(
+        user_message="I can't get over a breakup and I don't know what to do",
+        mode="perspective_shift",
+        kwargs_json="{}",
+        confidence="high",
+    ).with_inputs("user_message"),
+
+    dspy.Example(
+        user_message="How do I forgive a friend who hurt me badly?",
+        mode="perspective_shift",
+        kwargs_json="{}",
         confidence="high",
     ).with_inputs("user_message"),
 ]
