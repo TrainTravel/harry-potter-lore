@@ -1,4 +1,4 @@
-# Harry Potter Lore Agent
+# Lore Whisperer
 
 A RAG-powered agent that answers Harry Potter lore questions with cited sources, built as a pedagogical project to learn agent engineering, context engineering, and prompt optimization end-to-end.
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A Harry Potter lore agent (`lore_agent.ipynb`) that uses Google ADK for agent orchestration and ChromaDB as a vector store for RAG over HP lore content.
+**Lore Whisperer** — a Harry Potter lore agent (`lore_agent.ipynb`) that uses Google ADK for agent orchestration and ChromaDB as a vector store for RAG over HP lore content.
 
 ## Design decisions
 
@@ -50,7 +50,7 @@ The intended architecture is a RAG pipeline:
 
 ## deepTutor Improvements (branch: `claude/deeptutor-context-engineering-gRaiA`)
 
-This project extends the base HP lore agent with a full **context engineering harness**
+This project extends the base Lore Whisperer agent with a full **context engineering harness**
 modelled on the deepTutor open-source tutoring platform, addressing five architectural
 weaknesses found in that codebase.
 
