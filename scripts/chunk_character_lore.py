@@ -63,8 +63,12 @@ SKIP_SECTIONS = {
     "in video games", "non-canon", "trivia",
 }
 
-TARGET_MIN_WORDS = 200
-TARGET_MAX_WORDS = 400
+# Target band tuned for the all-MiniLM-L6-v2 embedder (sweet spot ~40-150
+# words). Was 200/400; 312-word chunks like the Aberforth-Albus relationship
+# diluted their embedding signal and lost ranking to shorter siblings even
+# when topically more relevant. See tasks/plan-rechunk.md (2026-05-09).
+TARGET_MIN_WORDS = 80
+TARGET_MAX_WORDS = 150
 
 
 # ---------------------------------------------------------------------------
@@ -225,7 +229,7 @@ def _chunk_by_words(text: str) -> Iterator[str]:
             # Prefer emitting around mid-target to avoid trailing short chunks
             yield " ".join(buf)
             buf, buf_wc = [], 0
-    if buf_wc >= 80:  # don't emit tiny tail fragments
+    if buf_wc >= 40:  # don't emit tiny tail fragments (lowered to match new band)
         yield " ".join(buf)
 
 

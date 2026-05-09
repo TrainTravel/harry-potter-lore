@@ -1,0 +1,252 @@
+{
+  "collection": "character_lore",
+  "top_k": 10,
+  "n_queries": 15,
+  "aggregate": {
+    "recall_at_5": 0.4,
+    "recall_at_10": 0.6666666666666666,
+    "mrr_at_10": 0.3357407407407408
+  },
+  "per_query": [
+    {
+      "query": "I haven't spoken to my brother in three years over a fight neither of us can remember the original cause of, but we both still tell ourselves we were right.",
+      "character": "albus-dumbledore",
+      "expected_pattern": "aberforth",
+      "rank": 6,
+      "hit_at_5": false,
+      "hit_at_10": true,
+      "mrr_contrib": 0.16666666666666666,
+      "top_5_doc_ids": [
+        "albus-dumbledore/relationships-family-ariana-dumbledore-001",
+        "albus-dumbledore/relationships-gellert-grindelwald-001",
+        "albus-dumbledore/relationships-family-parents-001",
+        "albus-dumbledore/relationships-harry-potter-003",
+        "albus-dumbledore/relationships-elphias-doge-001"
+      ]
+    },
+    {
+      "query": "How do you reconcile with a sibling after a tragic family loss has driven you apart?",
+      "character": "albus-dumbledore",
+      "expected_pattern": "aberforth",
+      "rank": 5,
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "mrr_contrib": 0.2,
+      "top_5_doc_ids": [
+        "albus-dumbledore/relationships-harry-potter-003",
+        "albus-dumbledore/relationships-family-parents-001",
+        "albus-dumbledore/relationships-family-ariana-dumbledore-001",
+        "albus-dumbledore/relationships-harry-potter-001",
+        "albus-dumbledore/relationships-family-aberforth-dumbledore-001"
+      ]
+    },
+    {
+      "query": "I lost the love of my life because of who I used to be, and I've spent every day since trying to make up for it.",
+      "character": "severus-snape",
+      "expected_pattern": "lily-evans",
+      "rank": 10,
+      "hit_at_5": false,
+      "hit_at_10": true,
+      "mrr_contrib": 0.1,
+      "top_5_doc_ids": [
+        "severus-snape/personality-and-traits-001",
+        "severus-snape/relationships-harry-potter-002",
+        "severus-snape/relationships-parents-001",
+        "severus-snape/relationships-harry-potter-004",
+        "severus-snape/relationships-harry-potter-001"
+      ]
+    },
+    {
+      "query": "How do I stand up to a workplace bully who has institutional power over me?",
+      "character": "minerva-mcgonagall",
+      "expected_pattern": "dolores-umbridge",
+      "rank": 1,
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "mrr_contrib": 1.0,
+      "top_5_doc_ids": [
+        "minerva-mcgonagall/relationships-dolores-umbridge-001",
+        "minerva-mcgonagall/biography-second-wizarding-war-high-inquisitor-at-hogwarts-002",
+        "minerva-mcgonagall/biography-second-wizarding-war-high-inquisitor-at-hogwarts-001",
+        "minerva-mcgonagall/biography-second-wizarding-war-st-mungo-s-hospital-001",
+        "minerva-mcgonagall/biography-second-wizarding-war-battle-of-hogwarts-first-stage-of-the-battle-001"
+      ]
+    },
+    {
+      "query": "People think I'm strange because I see things others don't and refuse to pretend I don't.",
+      "character": "luna-lovegood",
+      "expected_pattern": "personality-and-traits",
+      "rank": 1,
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "mrr_contrib": 1.0,
+      "top_5_doc_ids": [
+        "luna-lovegood/personality-and-traits-001",
+        "luna-lovegood/personality-and-traits-luna-s-beliefs-001",
+        "luna-lovegood/biography-later-life-001",
+        "luna-lovegood/biography-hogwarts-years-fifth-year-001",
+        "luna-lovegood/biography-later-life-as-a-magizoologist-001"
+      ]
+    },
+    {
+      "query": "I had to wipe my parents' memory to protect them, and I'm not sure I can ever undo it.",
+      "character": "hermione-granger",
+      "expected_pattern": "family-parents",
+      "rank": null,
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "mrr_contrib": 0.0,
+      "top_5_doc_ids": [
+        "hermione-granger/biography-horcrux-hunt-001",
+        "hermione-granger/biography-minister-for-magic-the-calamity-the-unforgivables-001",
+        "hermione-granger/biography-hogwarts-years-second-year-petrification-001",
+        "hermione-granger/biography-hogwarts-years-third-year-rescue-of-sirius-black-and-buckbeak-002",
+        "hermione-granger/biography-after-hogwarts-001"
+      ]
+    },
+    {
+      "query": "My best friend gets all the attention and I'm tired of being in his shadow.",
+      "character": "ron-weasley",
+      "expected_pattern": "envying-harry-potter",
+      "rank": null,
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "mrr_contrib": 0.0,
+      "top_5_doc_ids": [
+        "ron-weasley/biography-horcrux-hunt-exit-and-homecoming-002",
+        "ron-weasley/biography-later-life-seeing-off-his-daughter-001",
+        "ron-weasley/biography-horcrux-hunt-battle-of-hogwarts-001",
+        "ron-weasley/personality-and-traits-001",
+        "ron-weasley/relationships-ghosts-001"
+      ]
+    },
+    {
+      "query": "My parents died protecting me when I was a baby and I never got to know them.",
+      "character": "harry-potter",
+      "expected_pattern": "godric",
+      "rank": null,
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "mrr_contrib": 0.0,
+      "top_5_doc_ids": [
+        "harry-potter/biography-early-life-life-at-privet-drive-001",
+        "harry-potter/biography-horcrux-hunt-battle-of-hogwarts-snape-s-death-002",
+        "harry-potter/biography-hogwarts-years-third-year-1993-1994-elective-classes-001",
+        "harry-potter/biography-hogwarts-years-second-year-1992-1993-the-last-attack-001",
+        "harry-potter/biography-horcrux-hunt-battle-of-hogwarts-harry-s-sacrifice-001"
+      ]
+    },
+    {
+      "query": "When I was young I trusted my closest friend with everything, and they used my ambition against me.",
+      "character": "albus-dumbledore",
+      "expected_pattern": "grindelwald",
+      "rank": null,
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "mrr_contrib": 0.0,
+      "top_5_doc_ids": [
+        "albus-dumbledore/biography-first-wizarding-war-the-cursed-vaults-001",
+        "albus-dumbledore/relationships-patricia-rakepick-001",
+        "albus-dumbledore/relationships-remus-lupin-001",
+        "albus-dumbledore/biography-between-the-wars-1993-1994-002",
+        "albus-dumbledore/relationships-harry-potter-002"
+      ]
+    },
+    {
+      "query": "I'm terrified of dying. I would do anything to live forever.",
+      "character": "lord-voldemort",
+      "expected_pattern": "horcrux",
+      "rank": null,
+      "hit_at_5": false,
+      "hit_at_10": false,
+      "mrr_contrib": 0.0,
+      "top_5_doc_ids": [
+        "lord-voldemort/biography-legacy-post-mortem-001",
+        "lord-voldemort/biography-the-rise-of-the-dark-lord-lord-voldemort-s-request-002",
+        "lord-voldemort/biography-missing-years-001",
+        "lord-voldemort/relationships-severus-snape-002",
+        "lord-voldemort/relationships-severus-snape-001"
+      ]
+    },
+    {
+      "query": "I get along with animals more easily than with people. They don't judge me.",
+      "character": "rubeus-hagrid",
+      "expected_pattern": "pets-and-other-creatures",
+      "rank": 3,
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "mrr_contrib": 0.3333333333333333,
+      "top_5_doc_ids": [
+        "rubeus-hagrid/relationships-harry-potter-001",
+        "rubeus-hagrid/personality-and-traits-001",
+        "rubeus-hagrid/relationships-pets-and-other-creatures-001",
+        "rubeus-hagrid/relationships-hogwarts-students-001",
+        "rubeus-hagrid/relationships-hogwarts-staff-004"
+      ]
+    },
+    {
+      "query": "My father has very specific expectations about who I should become, and I don't know how to push back.",
+      "character": "draco-malfoy",
+      "expected_pattern": "family-parents",
+      "rank": 8,
+      "hit_at_5": false,
+      "hit_at_10": true,
+      "mrr_contrib": 0.125,
+      "top_5_doc_ids": [
+        "draco-malfoy/biography-after-hogwarts-001",
+        "draco-malfoy/personality-and-traits-001",
+        "draco-malfoy/relationships-lord-voldemort-002",
+        "draco-malfoy/biography-hogwarts-years-first-year-001",
+        "draco-malfoy/relationships-hogwarts-staff-001"
+      ]
+    },
+    {
+      "query": "How do I keep believing in things I can't prove when everyone around me dismisses them?",
+      "character": "luna-lovegood",
+      "expected_pattern": "luna-s-beliefs",
+      "rank": 1,
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "mrr_contrib": 1.0,
+      "top_5_doc_ids": [
+        "luna-lovegood/personality-and-traits-luna-s-beliefs-001",
+        "luna-lovegood/biography-later-life-the-calamity-001",
+        "luna-lovegood/biography-hogwarts-years-fifth-year-001",
+        "luna-lovegood/biography-later-life-as-a-hogwarts-professor-001",
+        "luna-lovegood/relationships-hermione-granger-001"
+      ]
+    },
+    {
+      "query": "I'm being asked to live a double life \u2014 pretending to be loyal to people I despise \u2014 to protect someone I love.",
+      "character": "severus-snape",
+      "expected_pattern": "double-agent",
+      "rank": 9,
+      "hit_at_5": false,
+      "hit_at_10": true,
+      "mrr_contrib": 0.1111111111111111,
+      "top_5_doc_ids": [
+        "severus-snape/personality-and-traits-004",
+        "severus-snape/biography-career-at-hogwarts-003",
+        "severus-snape/relationships-bellatrix-lestrange-001",
+        "severus-snape/relationships-harry-potter-001",
+        "severus-snape/relationships-albus-dumbledore-001"
+      ]
+    },
+    {
+      "query": "My friend married into my family and the kids ask me about her constantly, but we haven't spoken in years.",
+      "character": "ron-weasley",
+      "expected_pattern": "hermione-granger",
+      "rank": 1,
+      "hit_at_5": true,
+      "hit_at_10": true,
+      "mrr_contrib": 1.0,
+      "top_5_doc_ids": [
+        "ron-weasley/relationships-family-hermione-granger-004",
+        "ron-weasley/relationships-luna-lovegood-001",
+        "ron-weasley/relationships-family-children-001",
+        "ron-weasley/relationships-family-fleur-delacour-001",
+        "ron-weasley/relationships-ghosts-001"
+      ]
+    }
+  ]
+}
