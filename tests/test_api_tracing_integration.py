@@ -70,6 +70,8 @@ def patched_lm(monkeypatch):
         "verdict": "Verdict referencing the canon evidence weighed above.",
         "transcript": "Host A: First line. Host B: Second line. Host A: Third line. Host B: Fourth line.",
         "comedic_tension": "The absurdity of modern life colliding with magical institutions.",
+        # QueryPlanSignature (MultiToolDeepResearchModule makes 2 LLM calls)
+        "tool_calls": '[{"tool": "vector_search", "args": {"query": "test", "k": 5}}]',
     }
     lm = DummyLM(answers=[_answer_template] * 50)
     dspy.configure(lm=lm)

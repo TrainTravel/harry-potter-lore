@@ -250,3 +250,66 @@ roughly tied on quality; DSPy kept for architectural consistency.
 `slo_check.MODE_CONFIG` wires only `deep_research`, `guided_learning`, `debate`.
 Four modes (`satirical_podcast`, `perspective_shift`, `open_analysis`,
 `exam_grader`) are not yet gated — add them when their EVALSETs stabilise.
+
+---
+
+## Import discipline — keep orchestration code collection-safe
+
+### Rule
+
+Any file that acts as an orchestration or test wrapper (Temporal activities,
+FastAPI endpoints, test modules) **must not import from heavy infrastructure
+modules at module level** if those modules have transitive native-library deps
+(ChromaDB, onnxruntime, HuggingFace tokenizers).
+
+**Heavy modules in this project:** `context_harness.dspy_agent`,
+`context_harness.retrieval_tools`, `context_harness.rag_pipeline`.
+
+**Safe to import at module level:** stdlib, `dspy` primitives (`dspy.Module`,
+`dspy.Signature`), `temporalio`, `fastapi`, `pydantic`.
+
+### Pattern: lazy import inside the function
+
+```python
+# BAD — blocks test collection if ChromaDB/onnxruntime fails to load
+from context_harness.dspy_agent import QueryPlanSignature
+
+@activity.defn
+async def plan_tool_calls(question: str) -> list[dict]:
+    planner = dspy.ChainOfThought(QueryPlanSignature)
+    ...
+
+# GOOD — import is deferred to call time; collection is always safe
+@activity.defn
+async def plan_tool_calls(question: str) -> list[dict]:
+    from context_harness.dspy_agent import QueryPlanSignature, _parse_tool_calls
+    planner = dspy.ChainOfThought(QueryPlanSignature)
+    ...
+```
+
+### Why this matters in CI
+
+`dspy_agent.py` imports `retrieval_tools` → `tool_registry` → `rag_pipeline` →
+ChromaDB → onnxruntime at module level. If any native lib fails to load in a
+minimal CI image, the module never finishes executing. Names defined *after* the
+failing import (e.g. `QueryPlanSignature` on line 68) are then absent. Python
+surfaces this as `ImportError: cannot import name 'QueryPlanSignature'` — not
+the actual underlying error — and **pytest aborts collection for every test file
+that imported the wrapper**, hiding the real failure and blocking unrelated tests.
+
+On 2026-05-04 this caused `test_temporal_activities.py` and
+`test_temporal_workflows.py` to fail collection with a misleading error even
+though both files' own logic was correct.
+
+### Corollary: test patches must target the source, not the wrapper
+
+When a function imports lazily, `patch("wrapper_module.symbol")` fails because
+the symbol is never bound on that module. Patch the source instead:
+
+```python
+# BAD — build_retrieval_registry is not a module-level name in activities.py
+patch("temporal.activities.build_retrieval_registry")
+
+# GOOD — patch at source; lazy import inside the function picks up the mock
+patch("context_harness.retrieval_tools.build_retrieval_registry")
+```

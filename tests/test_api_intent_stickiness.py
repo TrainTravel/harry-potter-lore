@@ -56,6 +56,8 @@ _ANSWER_TEMPLATE = {
     # Router-shaped fields too, so DummyLM can serve any caller
     "mode": "open_analysis",
     "kwargs_json": "{}",
+    # QueryPlanSignature (MultiToolDeepResearchModule makes 2 LLM calls)
+    "tool_calls": '[{"tool": "vector_search", "args": {"query": "test", "k": 5}}]',
 }
 
 
