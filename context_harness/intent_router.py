@@ -53,10 +53,21 @@ class IntentRouterSignature(dspy.Signature):
         beyond factual retrieval. Example: "Why did Snape become the person he
         became?"
 
-    perspective_shift — the user wants advice from an HP character's perspective,
-        or wants to be sorted, counselled, or spoken to as/by a character.
-        Extract the character name into kwargs_json. Example: "What would
-        Dumbledore say about my career change?"
+    perspective_shift — ANY personal life situation, emotional question,
+        decision the user is facing, or request for advice — regardless of
+        whether the user names an HP character or mentions HP at all. Grief,
+        relationships, career doubts, family conflict, mental-health worries,
+        self-doubt, identity questions, "what do you think about [a person /
+        a situation]", "how do I cope with X", "I'm struggling with Y" all
+        belong here. If the user names a character, extract them into
+        kwargs_json; if not, leave kwargs empty — the product will ask the
+        user to pick a character.
+        Examples:
+        - "What would Dumbledore say about my career change?"
+        - "I'm going through a hard time."
+        - "How do I deal with imposter syndrome?"
+        - "What do you think about a mother who lost her sons?"
+        - "Sort me into a house" (character="Sorting Hat")
 
     debate — the user states a debatable claim about HP canon and wants both
         sides argued. Example: "Was Snape really a hero?"
@@ -65,13 +76,20 @@ class IntentRouterSignature(dspy.Signature):
         modern lens. Extract the modern_angle into kwargs_json if stated.
         Example: "Do a podcast about Quidditch as an extreme sport industry."
 
-    none — the message is off-topic (weather, math, non-HP fiction, greetings
-        with no HP content). Return mode="none".
+    none — reserve for messages that are clearly NEITHER about Harry Potter
+        NOR a personal life situation. Pure off-topic factual queries
+        (weather, math, stock prices, news, non-HP fiction) belong here.
+        Plain greetings with no other content ("hi", "hello") also belong
+        here. When in doubt between "none" and "perspective_shift" on an
+        emotional or life-situation message, prefer "perspective_shift" —
+        the product is designed to engage with these queries through a
+        character's voice.
 
     Rules:
     - Choose exactly ONE mode.
-    - For perspective_shift: extract character into kwargs_json. If the user
-      says "sort me" or "put me into a house", use character="Sorting Hat".
+    - For perspective_shift: extract character into kwargs_json IF the user
+      names one. Otherwise leave kwargs empty ({}). If the user says "sort
+      me" or "put me into a house", use character="Sorting Hat".
     - For exam_grader: extract student_answer into kwargs_json.
     - For satirical_podcast: extract modern_angle into kwargs_json if stated.
     - kwargs_json must be valid JSON or an empty object "{}".

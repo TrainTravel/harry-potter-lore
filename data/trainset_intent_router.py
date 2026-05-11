@@ -264,6 +264,24 @@ TRAINSET = [
         confidence="high",
     ).with_inputs("user_message"),
 
+    # Grief / loss / mental-health — heavy real-life situations the
+    # product is explicitly built to engage with via character voice.
+    # Two examples is enough; the broader Signature description carries
+    # the generalization.
+    dspy.Example(
+        user_message="What do you think about a mother who lost her sons?",
+        mode="perspective_shift",
+        kwargs_json="{}",
+        confidence="high",
+    ).with_inputs("user_message"),
+
+    dspy.Example(
+        user_message="I'm grieving the loss of my brother and don't know how to keep going",
+        mode="perspective_shift",
+        kwargs_json="{}",
+        confidence="high",
+    ).with_inputs("user_message"),
+
     # --- debate (5 examples) ---
     dspy.Example(
         user_message="Was Snape really a hero?",

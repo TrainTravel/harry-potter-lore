@@ -10,9 +10,9 @@
         "confidence": "high"
       },
       {
-        "user_message": "Give me a pep talk as McGonagall",
-        "mode": "perspective_shift",
-        "kwargs_json": "{\"character\": \"McGonagall\"}",
+        "user_message": "Why did Snape become the person he became?",
+        "mode": "open_analysis",
+        "kwargs_json": "{}",
         "confidence": "high"
       },
       {
@@ -22,9 +22,9 @@
         "confidence": "high"
       },
       {
-        "user_message": "Podcast: wizarding dating apps",
-        "mode": "satirical_podcast",
-        "kwargs_json": "{\"modern_angle\": \"dating apps\"}",
+        "user_message": "Is Voldemort's defeat inevitable or could he have won?",
+        "mode": "debate",
+        "kwargs_json": "{}",
         "confidence": "high"
       },
       {
@@ -34,14 +34,14 @@
         "confidence": "low"
       },
       {
-        "user_message": "What's the capital of France?",
-        "mode": "none",
-        "kwargs_json": "{}",
+        "user_message": "Podcast: wizarding dating apps",
+        "mode": "satirical_podcast",
+        "kwargs_json": "{\"modern_angle\": \"dating apps\"}",
         "confidence": "high"
       },
       {
-        "user_message": "Can you walk me through Dumbledore's plan step by step?",
-        "mode": "guided_learning",
+        "user_message": "Was Snape really a hero?",
+        "mode": "debate",
         "kwargs_json": "{}",
         "confidence": "high"
       },
@@ -58,20 +58,20 @@
         "confidence": "high"
       },
       {
-        "user_message": "Solve this equation: 2x + 3 = 7",
-        "mode": "none",
-        "kwargs_json": "{}",
-        "confidence": "high"
-      },
-      {
-        "user_message": "My best friend and I are drifting apart — what do I do?",
+        "user_message": "Put me into a house",
         "mode": "perspective_shift",
+        "kwargs_json": "{\"character\": \"Sorting Hat\"}",
+        "confidence": "high"
+      },
+      {
+        "user_message": "Who were the original members of the Order of the Phoenix?",
+        "mode": "deep_research",
         "kwargs_json": "{}",
         "confidence": "high"
       },
       {
-        "user_message": "Tell me about the Lord of the Rings",
-        "mode": "none",
+        "user_message": "Compare the leadership styles of Dumbledore and Voldemort",
+        "mode": "open_analysis",
         "kwargs_json": "{}",
         "confidence": "high"
       },
@@ -94,8 +94,8 @@
         "confidence": "high"
       },
       {
-        "user_message": "Was Snape really a hero?",
-        "mode": "debate",
+        "user_message": "Solve this equation: 2x + 3 = 7",
+        "mode": "none",
         "kwargs_json": "{}",
         "confidence": "high"
       }
