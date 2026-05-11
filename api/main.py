@@ -292,52 +292,32 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="HP Lore Agent API", lifespan=lifespan)
 
-# CORS — Lovable / Vercel / localhost frontends. Narrow origins for production.
+# CORS — explicit allowlist. The deployed UI lives on Lovable; local
+# dev runs on Vite (5173) and uvicorn (8000). Extra origins can be added
+# via the CORS_EXTRA_ORIGINS env var (comma-separated) without a redeploy.
+_CORS_ORIGINS = [
+    "https://lore-whisperer-ui.lovable.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:8000",
+]
+_extra = os.environ.get("CORS_EXTRA_ORIGINS", "").strip()
+if _extra:
+    _CORS_ORIGINS.extend(o.strip() for o in _extra.split(",") if o.strip())
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_CORS_ORIGINS,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
-
-@app.get("/debug-key")
-def debug_key() -> dict[str, Any]:
-    """Temporary debug endpoint — remove after deploy issue is resolved."""
-    import litellm as _lt
-    key_from_env = os.environ.get("GOOGLE_API_KEY", "")
-    gemini_from_env = os.environ.get("GEMINI_API_KEY", "")
-    lt_api_key = getattr(_lt, "api_key", None)
-    try:
-        from litellm import get_api_key_from_env
-        resolved = get_api_key_from_env()
-    except Exception as e:
-        resolved = f"error: {e}"
-    # Try a raw litellm call
-    raw_error = None
-    try:
-        _lt.completion(
-            model="gemini/gemini-2.5-flash-lite",
-            messages=[{"role": "user", "content": "Say hi"}],
-            max_tokens=5,
-        )
-        raw_error = "SUCCESS"
-    except Exception as e:
-        raw_error = f"{type(e).__name__}: {str(e)[:200]}"
-    return {
-        "google_api_key_len": len(key_from_env),
-        "google_api_key_preview": f"{key_from_env[:4]}...{key_from_env[-4:]}" if len(key_from_env) > 8 else "short",
-        "gemini_api_key_len": len(gemini_from_env),
-        "litellm_api_key": f"{str(lt_api_key)[:4]}..." if lt_api_key else None,
-        "litellm_version": getattr(_lt, "__version__", getattr(_lt, "version", "unknown")),
-        "get_api_key_from_env": f"{str(resolved)[:4]}..." if resolved and not str(resolved).startswith("error") else str(resolved),
-        "raw_litellm_call": raw_error,
-    }
-
 
 @app.get("/health")
 def health() -> dict[str, Any]:
