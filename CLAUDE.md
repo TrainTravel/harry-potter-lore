@@ -250,3 +250,51 @@ roughly tied on quality; DSPy kept for architectural consistency.
 `slo_check.MODE_CONFIG` wires only `deep_research`, `guided_learning`, `debate`.
 Four modes (`satirical_podcast`, `perspective_shift`, `open_analysis`,
 `exam_grader`) are not yet gated — add them when their EVALSETs stabilise.
+
+---
+
+## Cross-repo invariants (frontend ↔ backend)
+
+The Lovable frontend lives in a **separate repo**, `hogwarts-chat`. Several
+constants must stay in sync across the two repos. There is no compile-time
+link — drift is silent until a user reports the symptom in production.
+
+### Constants that must match
+
+| Backend (this repo) | Frontend (`hogwarts-chat`) | Controls |
+|---|---|---|
+| `_CHAT_MODES` (`api/main.py:104`) | `CONVO_MODES` (`src/lib/conversationStore.ts`) | Which modes get multi-turn chat history loaded and persisted in the sidebar |
+| `MODES` (`context_harness/dspy_agent.py:521`) | `Mode` type (`src/components/ModeToggle.tsx`) | The full set of valid mode strings |
+| `AskResponse` fields (`api/main.py`) | `Message` type (`src/components/Chat.tsx`) | Response shape — adding a field server-side requires a frontend type update for the UI to read it |
+| `_CHARACTER_SLUG` (`context_harness/dspy_agent.py`) | `CHARACTERS` (`src/components/CharacterSelect.tsx`) | Character slugs the UI offers vs. the slugs the backend resolves |
+
+### Failure mode
+
+A real example (2026-05-13): adding `perspective_shift` to backend
+`_CHAT_MODES` enabled multi-turn chat history loading, but the frontend's
+`CONVO_MODES` was never updated. Result: backend wrote orphan conversations
+to SQLite that the UI couldn't surface; users couldn't resume chats across
+page reloads; the sidebar appeared broken.
+
+### Rule
+
+When changing any backend constant in the left column, **update the
+matching frontend constant in the same change-set**. Open the frontend
+PR before merging the backend PR if possible, so both ship together.
+
+### Medium-term fix
+
+The backend exposes `/openapi.json`. The right long-term fix is
+`openapi-typescript` codegen in the frontend repo so the constants
+derive from generated types instead of being hand-maintained. Then drift
+becomes a compile error. Not done yet (2026-05-13).
+
+### Quick audit
+
+Before merging any backend PR that touches the constants above, grep the
+frontend repo for the matching constant name:
+
+```bash
+cd ../hogwarts-chat
+grep -rE "CONVO_MODES|Mode =|StoredConversation" src/
+```
