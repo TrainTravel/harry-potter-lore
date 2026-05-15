@@ -2,13 +2,13 @@
   "schema_version": 1,
   "embedding_model": "all-MiniLM-L6-v2",
   "program_hashes": {
-    "perspective_shift": "dede3aafeccc5cf3176d287312d31a20319fed05a10a6e5b4d58a03cb5459cae",
-    "deep_research": "6ac2a287cb9478012996c8d414d25a2a590567f2643e3f89c9c7a5e98f8cb51b",
     "debate": "5c581643d627e34918224cb6f39e6047595b80db5a1ef3ab9e743d8a2deea27f",
+    "deep_research": "6ac2a287cb9478012996c8d414d25a2a590567f2643e3f89c9c7a5e98f8cb51b",
+    "guided_learning": "d145a304f1f81123e18162b52449300d0cb27ce3e52ace67303f8a995cb4ae6f",
+    "perspective_shift": "dede3aafeccc5cf3176d287312d31a20319fed05a10a6e5b4d58a03cb5459cae",
+    "open_analysis": "d953e32ab1c4d760f60814ec7dbc8771b68ed055d0a63dc0aff72729ff1c3a59",
     "satirical_podcast": "7e0bd704afa07e693dad895304cda9788959ba090f0cafdc3a67ef62767eaf05",
-    "guided_learning": "1c21e995ebcdb1d93d5187868531ab7750013ab5ba2f83e6e39f0caef4d19339",
-    "exam_grader": "a1173a4b86eae5c7256ce593c5f1d8bb31249e85114287a584857d88702c6fd1",
-    "open_analysis": "d953e32ab1c4d760f60814ec7dbc8771b68ed055d0a63dc0aff72729ff1c3a59"
+    "exam_grader": "a1173a4b86eae5c7256ce593c5f1d8bb31249e85114287a584857d88702c6fd1"
   },
-  "created_at": 1778519827.479681
+  "created_at": 1778848848.506049
 }

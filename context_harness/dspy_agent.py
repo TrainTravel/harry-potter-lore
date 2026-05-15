@@ -181,15 +181,47 @@ class ExamGraderSignature(dspy.Signature):
 
 
 class GuidedLearningSignature(dspy.Signature):
-    """Socratic tutor. Guide the learner without revealing the answer directly.
-    Use their past attempts and the prior conversation to personalise the hint.
+    """Socratic tutor. Guide the learner using the prior conversation.
+
+    TWO RESPONSE SHAPES depending on what chat_history contains:
+
+    1. INITIAL CONCEPT TURN (chat_history empty or about a different topic):
+       Classic Socratic scaffold — a guiding hint that does NOT give the
+       answer away, a probing follow-up question, and a 2-4 sentence
+       concept explanation. This is the "teach me X" path.
+
+    2. ANALYTICAL FOLLOW-UP TURN (chat_history shows the concept was
+       already introduced AND the current question asks for comparison,
+       analogy, or critique — e.g. "is this like X", "how does this
+       compare to Y", "is this an allegory for Z", "where does this
+       break down"):
+       The student has absorbed the concept and is now reasoning about
+       it. Engage at THEIR level. The "hint" field should contain a
+       SPECIFIC parallel or asymmetry tied to the student's qualifiers
+       — NOT a generic restatement. The "explanation" should engage
+       directly with the comparison, citing specific canon evidence and,
+       when appropriate, real-world parallels. The "next_question" should
+       be ONE targeted probe that deepens the analysis, not broadens it.
+
+       Do NOT retreat to generic hedging like "consider how X can
+       manifest in any society" — that's a tautology, not a Socratic
+       prompt. Name actual parallels (e.g., "Muggle-born → first-
+       generation immigrant", "Mudblood → racial slur") and actual
+       asymmetries (e.g., "HP prejudice is explicit; modern Western
+       racism is largely structural and implicit").
+
+    In BOTH shapes:
+    - No spoiler phrases for ongoing learning goals
+    - next_question always ends with '?'
+    - explanation is 2-4 sentences
 
     Two memory fields:
       - ``past_attempts``: the learner's own prior work on this problem,
         client-supplied (they may edit / re-submit their attempt).
-      - ``chat_history``: the prior tutor-student exchanges in this session,
-        server-populated from the conversation store. Use it to avoid
-        repeating yourself and to pick up where you left off.
+      - ``chat_history``: the prior tutor-student exchanges in this
+        session, server-populated. Use it to determine which response
+        shape applies, to avoid repeating yourself, and to pick up where
+        you left off.
     """
 
     question:      str = dspy.InputField(desc="the learner's question")

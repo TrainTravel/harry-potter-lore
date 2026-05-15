@@ -241,6 +241,120 @@ TRAINSET = [
             "destruction strategy."
         ),
     ).with_inputs("question", "past_attempts"),
+
+    # ---- Analytical follow-up examples (turn 2+) ----
+    # These demos teach the model the SECOND response shape from the
+    # Signature: chat_history is populated, the student has absorbed the
+    # concept on turn 1, and is now asking a comparison/analogy/critique
+    # question. The hint should name a SPECIFIC parallel or asymmetry
+    # — not retreat to generic hedging.
+
+    # The literal production failure case (2026-05-15).
+    dspy.Example(
+        question="is it like the racism implicitly but widely shown in the western society",
+        past_attempts="none",
+        chat_history=(
+            "[1] Student: Explain blood status politics like I'm new to the series\n"
+            "[1] Tutor: Blood status is a hierarchy based on wizarding heritage. "
+            "Pure-bloods (both parents magical) sit at the top, Half-bloods "
+            "below them, and Muggle-borns (born to non-magical parents) at "
+            "the bottom. The slur 'Mudblood' is reserved for Muggle-borns."
+        ),
+        hint=(
+            "There are real parallels worth naming: most readers map "
+            "Muggle-born to first-generation immigrants or members of "
+            "marginalised minorities, and 'Mudblood' to racial slurs in our "
+            "world. But notice an important asymmetry — HP blood-status "
+            "prejudice is explicit and *stated* (Death Eaters say it out loud, "
+            "the Ministry runs a Muggle-Born Registration Commission), whereas "
+            "modern Western racism more often lives in implicit structures: "
+            "hiring biases, lending decisions, who gets stopped by police."
+        ),
+        next_question=(
+            "Where do you think the comparison breaks down — what about "
+            "modern racism doesn't have a clean HP analogue?"
+        ),
+        explanation=(
+            "Rowling drew on European antisemitism and Nazi racial-purity laws "
+            "as direct sources; the Muggle-Born Registration Commission echoes "
+            "Nuremberg-era bureaucracy almost beat-for-beat. The in-universe "
+            "prejudice is more openly declared than most contemporary Western "
+            "racism, which lives in systems and assumptions rather than slurs. "
+            "Read the comparison as 'same machinery, different visibility'."
+        ),
+    ).with_inputs("question", "past_attempts", "chat_history"),
+
+    # Non-racism analogue — proves the shape isn't tied to one topic.
+    dspy.Example(
+        question="is the Sorting Hat just like elite university admissions?",
+        past_attempts="none",
+        chat_history=(
+            "[1] Student: How does the Sorting Hat work?\n"
+            "[1] Tutor: The Hat is a magical artefact that reads a student's "
+            "values, talents, and willingness, then assigns them to one of "
+            "four houses for their entire schooling. Crucially, it takes the "
+            "student's *own preference* into account — Harry chose Gryffindor "
+            "over Slytherin and was honoured."
+        ),
+        hint=(
+            "The parallel that fits best is *legacy admissions plus peer "
+            "effects*. Like Ivy League sorting, Hogwarts houses signal "
+            "lifelong networks and reputational halos (Slytherin = ambitious "
+            "elites, Hufflepuff = the 'less prestigious' choice). But two "
+            "asymmetries cut hard: the Hat consults the student's actual "
+            "preference (real admissions don't), and there's no money or "
+            "tutoring industry behind getting into a specific house."
+        ),
+        next_question=(
+            "If real-world admissions could weigh a student's stated "
+            "preference the way the Hat does, would the inequality problem "
+            "go away — or just take a different shape?"
+        ),
+        explanation=(
+            "The Sorting Hat compresses an admissions decision into a single "
+            "moment of consent-aware judgement, which is unlike how elite "
+            "universities work (multi-year prep, gatekeepers, paid coaches). "
+            "Where the comparison holds: the house you land in shapes who "
+            "your friends are, what teachers expect of you, and what stories "
+            "get told about you. That peer-and-prior effect is very real in "
+            "both worlds."
+        ),
+    ).with_inputs("question", "past_attempts", "chat_history"),
+
+    # Critique-flavored follow-up — "where does this break down?" — teaches
+    # the model that pushback questions also belong in the analytical shape.
+    dspy.Example(
+        question="where does the prophecy idea break down compared to real-world fate or predestination?",
+        past_attempts="I was thinking it's like Calvinist predestination — everything decided in advance.",
+        chat_history=(
+            "[1] Student: How does prophecy work in HP?\n"
+            "[1] Tutor: Prophecies in HP are conditional and partial — the "
+            "prophecy about Harry could have applied to Neville, and only "
+            "became 'about' Harry because Voldemort *chose* to act on it. "
+            "Dumbledore is explicit: 'It is our choices that show what we "
+            "truly are, far more than our abilities.'"
+        ),
+        hint=(
+            "The Calvinist comparison snags on exactly that conditional "
+            "structure. Calvinist predestination is unconditional — God's "
+            "decree precedes and determines action. HP prophecy is closer "
+            "to *self-fulfilling* — it's only binding because Voldemort "
+            "treated it as binding. Without his choice to mark Harry, the "
+            "prophecy would simply not have been about Harry."
+        ),
+        next_question=(
+            "If prophecy in HP is essentially self-fulfilling, what does "
+            "that imply about whether characters are ever 'really' fated?"
+        ),
+        explanation=(
+            "The HP system is closer to Greek tragic irony (Oedipus tries "
+            "to escape the prophecy and thereby fulfils it) than to "
+            "Christian predestination. The mechanism is choice-amplified, "
+            "not choice-overriding. Notice that Dumbledore's lesson about "
+            "choices isn't a comforting aside — it's the load-bearing claim "
+            "about how prophecy actually works in this universe."
+        ),
+    ).with_inputs("question", "past_attempts", "chat_history"),
 ]
 
 
