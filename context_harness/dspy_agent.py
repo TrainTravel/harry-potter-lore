@@ -350,7 +350,16 @@ def _detect_character_in_question(question: str) -> Optional[str]:
 class PerspectiveShiftModule(dspy.Module):
     """
     Retrieves lore about a specific character, then applies their philosophy
-    to a real-world scenario via ChainOfThought.
+    to a real-world scenario via dspy.Predict over a 5-field Signature.
+
+    Uses ``dspy.Predict`` (no CoT rationale) after a 30-scenario A/B/C
+    ablation found CoT regressed voice / canon-anchor / actionability on
+    this task at flash-lite scale (single-judge Gemini-Flash, n=30):
+    dropping CoT won 20/30 on voice, 13/30 on canon-anchor, 14/30 on
+    actionability. Scaffolding output fields (principle / applied_insight
+    / reasoning) are retained — they earn their keep as in-prompt
+    thought scaffolds; trimming them in a separate variant regressed
+    all three quality axes vs the CoT-drop alone.
 
     Retrieval strategy
     ------------------
@@ -372,7 +381,7 @@ class PerspectiveShiftModule(dspy.Module):
         self._pipeline = pipeline
         self._char_pipeline = char_pipeline
         self._k = k
-        self.predict = dspy.ChainOfThought(PerspectiveShiftSignature)
+        self.predict = dspy.Predict(PerspectiveShiftSignature)
 
     def forward(
         self,
