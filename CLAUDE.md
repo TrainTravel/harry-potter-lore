@@ -267,6 +267,7 @@ link — drift is silent until a user reports the symptom in production.
 | `MODES` (`context_harness/dspy_agent.py:521`) | `Mode` type (`src/components/ModeToggle.tsx`) | The full set of valid mode strings |
 | `AskResponse` fields (`api/main.py`) | `Message` type (`src/components/Chat.tsx`) | Response shape — adding a field server-side requires a frontend type update for the UI to read it |
 | `_CHARACTER_SLUG` (`context_harness/dspy_agent.py`) | `CHARACTERS` (`src/components/CharacterSelect.tsx`) | Character slugs the UI offers vs. the slugs the backend resolves |
+| `MODES` (`context_harness/dspy_agent.py`) | `CATEGORY_BY_MODE` (`src/components/Chat.tsx`) | Welcome-screen chip filtering when a mode is locked. Adding a backend mode that should have a curated chip pool requires extending this map (or accepting the all-categories fallback) |
 
 ### Failure mode
 
