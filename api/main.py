@@ -108,19 +108,29 @@ def _decide_effective_mode(
     routed_mode: str | None,
     router_confidence: str | None,
     prior_mode: str | None,
+    prior_character: str | None = None,
 ) -> tuple[str | None, str]:
     """Pick the effective mode for a turn given router output + prior turn.
 
-    Pure function — no IO, no globals. Three inputs, two outputs:
+    Pure function — no IO, no globals. Four inputs, two outputs:
         Returns: (effective_mode, source)
-        source ∈ {"router", "sticky", "router-override"}
+        source ∈ {"router", "sticky", "router-override", "character-lock"}
 
     Rules (see SPEC.md §Acceptance + tasks/plan.md):
       1. No prior_mode → trust the router (turn 1 / no conversation_id)
       2. prior_mode == "none" → router gets a fresh vote (user re-engaging)
       3. routed_mode == prior_mode → router agrees, no change
-      4. high-confidence different non-"none" mode → honor switch
-      5. otherwise (low/medium confidence or "none" classification) → stick
+      4. character-lock: prior turn was a real character chat
+         (prior_mode == "perspective_shift" AND prior_character is set to a
+         non-default slug) → never override to a non-perspective_shift mode.
+         Analytical-sounding follow-ups inside a Luna chat ("can I
+         understand the WHOLE picture") trip the router into open_analysis
+         on high confidence, even though the user is clearly mid-chat with
+         the character. The user has explicit signal — the bound character
+         — that they want voice continuity. To break out they can use the
+         mode selector or start a new chat.
+      5. high-confidence different non-"none" mode → honor switch
+      6. otherwise (low/medium confidence or "none" classification) → stick
     """
     # Rule 1: no prior turn — trust router unconditionally
     if prior_mode is None:
@@ -134,13 +144,24 @@ def _decide_effective_mode(
     if routed_mode == prior_mode:
         return prior_mode, "router"
 
-    # Rule 4: high-confidence override (must be a real, non-"none" mode)
+    # Rule 4: character-lock — active character chat suppresses cross-mode
+    # router overrides. Only applies when the prior turn was a real
+    # character chat: perspective_shift + a bound, non-default character.
+    # Treat the legacy "Dumbledore" default as unset (matches the dispatch
+    # carry-forward heuristic just below).
+    if (prior_mode == "perspective_shift"
+            and prior_character
+            and prior_character != "Dumbledore"
+            and routed_mode != "perspective_shift"):
+        return prior_mode, "character-lock"
+
+    # Rule 5: high-confidence override (must be a real, non-"none" mode)
     if (router_confidence == "high"
             and routed_mode is not None
             and routed_mode != "none"):
         return routed_mode, "router-override"
 
-    # Rule 5: stickiness wins — keep prior_mode
+    # Rule 6: stickiness wins — keep prior_mode
     return prior_mode, "sticky"
 _conversation_store: ConversationStore | None = None
 
@@ -443,6 +464,7 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
             routed_mode=routed_mode,
             router_confidence=router_confidence,
             prior_mode=prior_mode,
+            prior_character=prior_character,
         )
         _record(turn_id, "router.decision", {
             "prior_mode": prior_mode,

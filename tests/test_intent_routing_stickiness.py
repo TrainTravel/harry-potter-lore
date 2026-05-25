@@ -1,18 +1,22 @@
 """
 Intent-router stickiness — decision-helper unit tests
 =====================================================
-``_decide_effective_mode(routed_mode, router_confidence, prior_mode)`` is the
-pure function that picks the effective mode for a turn. The rules:
+``_decide_effective_mode(routed_mode, router_confidence, prior_mode,
+prior_character)`` is the pure function that picks the effective mode
+for a turn. The rules:
 
   1. No prior_mode → trust the router.
   2. prior_mode == "none" → router gets a fresh vote.
   3. routed_mode == prior_mode → no change.
-  4. high-confidence different mode → switch (router-override).
-  5. otherwise → stick to prior_mode.
+  4. character-lock: prior was perspective_shift + non-default character,
+     routed to a non-perspective_shift mode → stay in perspective_shift.
+  5. high-confidence different mode → switch (router-override).
+  6. otherwise → stick to prior_mode.
 
 Returns ``(effective_mode, source)`` where source ∈ {"router", "sticky",
-"router-override"}. Pure: no IO, no globals — every input is an explicit
-argument, so unit tests don't need fixtures or mocks.
+"router-override", "character-lock"}. Pure: no IO, no globals — every
+input is an explicit argument, so unit tests don't need fixtures or
+mocks.
 
 Backs SPEC.md acceptance criteria 1–5 + the 6-row decision table in
 tasks/plan.md.
@@ -100,3 +104,94 @@ def test_decide_effective_mode_handles_none_routed_mode_gracefully():
     )
     assert mode == "open_analysis"
     assert source == "sticky"
+
+
+# ---------- Character-lock rule (Rule 4) ----------------------------------
+#
+# Reproduces the 2026-05-25 production bug: a Luna chat (perspective_shift +
+# luna-lovegood) where turn 3's analytical-sounding follow-up ("so I might
+# likely to have the capacity to reconnect if I can understand the WHOLE
+# picture of them") got classified high-confidence as open_analysis. Without
+# character-lock, Rule 5 (router-override) fires; with it, we stay in voice.
+
+@pytest.mark.parametrize(
+    "routed_mode, confidence, prior_character, expected_mode, expected_source",
+    [
+        # Bug repro: high-confidence open_analysis routing in active Luna chat
+        # → character-lock holds the mode.
+        pytest.param(
+            "open_analysis", "high", "luna-lovegood",
+            "perspective_shift", "character-lock",
+            id="active_character_chat_locks_against_high_conf_open_analysis",
+        ),
+        # Same lock applies to other cross-mode high-confidence routes
+        # (debate, satirical_podcast, deep_research) — any non-perspective
+        # destination is suppressed when a real character is bound.
+        pytest.param(
+            "debate", "high", "sirius-black",
+            "perspective_shift", "character-lock",
+            id="active_character_chat_locks_against_debate_route",
+        ),
+        pytest.param(
+            "satirical_podcast", "high", "minerva-mcgonagall",
+            "perspective_shift", "character-lock",
+            id="active_character_chat_locks_against_satire_route",
+        ),
+        # Low-confidence routes hit stickiness BEFORE character-lock, but
+        # they still resolve to perspective_shift either way — character-lock
+        # just labels the source for telemetry / future debugging.
+        pytest.param(
+            "open_analysis", "low", "luna-lovegood",
+            "perspective_shift", "character-lock",
+            id="active_character_chat_locks_low_conf_route_too",
+        ),
+        # Legacy "Dumbledore" sentinel is treated as unset — older clients
+        # that silently defaulted to Dumbledore shouldn't accidentally lock
+        # modes mid-conversation. Falls through to normal stickiness rules.
+        pytest.param(
+            "open_analysis", "high", "Dumbledore",
+            "open_analysis", "router-override",
+            id="dumbledore_default_does_not_trigger_character_lock",
+        ),
+        # No prior character (just perspective_shift with empty character)
+        # → no lock, normal rules apply.
+        pytest.param(
+            "open_analysis", "high", None,
+            "open_analysis", "router-override",
+            id="no_prior_character_skips_lock",
+        ),
+        # Router agrees with prior perspective_shift → Rule 3 wins before
+        # character-lock is consulted. Source stays "router", not "lock".
+        pytest.param(
+            "perspective_shift", "high", "luna-lovegood",
+            "perspective_shift", "router",
+            id="router_agrees_no_lock_needed",
+        ),
+    ],
+)
+def test_character_lock_rule(
+    routed_mode, confidence, prior_character, expected_mode, expected_source,
+):
+    actual_mode, actual_source = _decide_effective_mode(
+        routed_mode=routed_mode,
+        router_confidence=confidence,
+        prior_mode="perspective_shift",
+        prior_character=prior_character,
+    )
+    assert actual_mode == expected_mode
+    assert actual_source == expected_source
+
+
+def test_character_lock_only_triggers_when_prior_was_perspective_shift():
+    """A Luna character bound to a prior open_analysis turn (somehow) must
+    NOT lock — character-lock is gated on the prior MODE being a real
+    character chat, not just any prior turn that happened to carry a
+    character slug."""
+    mode, source = _decide_effective_mode(
+        routed_mode="debate",
+        router_confidence="high",
+        prior_mode="open_analysis",
+        prior_character="luna-lovegood",  # weird state, shouldn't lock
+    )
+    assert mode == "debate"
+    assert source == "router-override"
