@@ -95,7 +95,7 @@ from context_harness.conversation import (
     DEFAULT_KEEP_RECENT,
 )
 from context_harness.cost_tracker import estimate_cost_usd
-from context_harness.dspy_agent import DSPyAgent
+from context_harness.dspy_agent import DSPyAgent, _detect_character_in_question
 from context_harness.ingest_lore import build_pipeline
 from context_harness.security import PromptGuard, InputValidator, OutputFilter
 
@@ -501,6 +501,22 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
                 and _is_bound_character(prior_character)
                 and not _is_bound_character(dispatch_character)):
             dispatch_character = prior_character
+
+    # Last-ditch character resolution before disambiguation: scan the
+    # question text for a named character ("Luna's take on...", "ask
+    # Hermione how to..."). If found, treat it as an implicit pick so
+    # the user isn't asked which character they want for a question
+    # that already names one. Runs only when neither the request nor
+    # the prior turn supplied a character — explicit signals from the
+    # client take precedence over text scraping.
+    if (dispatch_mode == "perspective_shift"
+            and not _is_bound_character(dispatch_character)):
+        detected = _detect_character_in_question(req.question)
+        if detected:
+            dispatch_character = detected
+            _record(turn_id, "perspective.character_from_question", {
+                "detected": detected,
+            })
 
     # Perspective-shift disambiguation: when the dispatch lands on
     # perspective_shift but no character is set, return clickable character

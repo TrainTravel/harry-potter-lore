@@ -324,6 +324,69 @@ def test_perspective_shift_with_character_skips_disambiguation(client, monkeypat
     assert len(_events_of_kind(body["turn_id"], "perspective.disambiguation")) == 0
 
 
+def test_perspective_shift_detects_character_named_in_question(client, monkeypatch):
+    """Bug repro (2026-05-26): a question that explicitly names a character
+    ("Luna's take on...") with no `character` field in the body should
+    bypass the disambiguation flow — the user already told us who they
+    want. Otherwise we ask them to pick a character for a question that
+    already names one."""
+    _patch_route_only(monkeypatch, mode="perspective_shift", confidence="high")
+
+    r = client.post("/ask", json={
+        "question": "Luna's take on social anxiety at parties",
+        "mode": "auto",
+        # NOTE: no `character` field — frontend didn't pre-bind. Detector
+        # should resolve from the question text.
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert body["routed_mode"] == "perspective_shift"
+    # Disambiguation must NOT have fired — character was detected from text
+    assert body["options"] is None
+    assert len(_events_of_kind(body["turn_id"], "perspective.disambiguation")) == 0
+    # The detection event should be in the trace
+    detect_events = _events_of_kind(body["turn_id"], "perspective.character_from_question")
+    assert len(detect_events) == 1
+    assert detect_events[0]["attrs"]["detected"] == "luna-lovegood"
+
+
+def test_perspective_shift_no_character_mention_still_disambiguates(client, monkeypatch):
+    """The character-detection fallback must not steal the disambiguation
+    flow when the question doesn't name a character. Free-form prompts
+    like "how do I deal with X" should still surface the options chips."""
+    _patch_route_only(monkeypatch, mode="perspective_shift", confidence="high")
+
+    r = client.post("/ask", json={
+        "question": "How do I deal with imposter syndrome?",  # no character named
+        "mode": "auto",
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert body["options"] is not None
+    assert len(body["options"]) == 9
+    # No detection event — nothing to detect
+    assert len(_events_of_kind(body["turn_id"], "perspective.character_from_question")) == 0
+
+
+def test_perspective_shift_explicit_character_wins_over_detection(client, monkeypatch):
+    """If the request body sets character explicitly, the detector must
+    NOT override it. Explicit picks beat text scraping."""
+    _patch_route_only(monkeypatch, mode="perspective_shift", confidence="high")
+
+    r = client.post("/ask", json={
+        # Question names Hermione, body sets Sirius — body should win.
+        "question": "Hermione's advice for me",
+        "mode": "auto",
+        "character": "sirius-black",
+    })
+    assert r.status_code == 200
+    body = r.json()
+    # No detection event because dispatch_character was already bound
+    assert len(_events_of_kind(body["turn_id"], "perspective.character_from_question")) == 0
+    # No disambiguation either
+    assert len(_events_of_kind(body["turn_id"], "perspective.disambiguation")) == 0
+
+
 def test_explicit_perspective_shift_no_character_returns_options(client):
     """Even when the client pins mode=perspective_shift explicitly (no
     router involved), missing character still triggers the options branch."""
