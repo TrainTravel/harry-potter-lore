@@ -246,6 +246,42 @@ def test_detect_character_returns_none_for_no_character():
     assert _detect_character_in_question("") is None
 
 
+def test_detect_character_handles_possessive_form():
+    """User-typed prompts like "Luna's take on..." or "Sirius's family"
+    must resolve — possessive 's' is non-word so \\b boundary holds."""
+    from context_harness.dspy_agent import _detect_character_in_question
+    assert _detect_character_in_question("Luna's take on social anxiety") == "luna-lovegood"
+    assert _detect_character_in_question("Hermione's advice on burnout") == "hermione-granger"
+    assert _detect_character_in_question("Sirius's family situation") == "sirius-black"
+
+
+def test_detect_character_finds_sirius_and_aliases():
+    """Sirius Black was missing from the slug dict before 2026-05-26;
+    welcome-screen chips offered him but the detector returned None.
+    Includes Padfoot (Marauder nickname) since fans use it freely."""
+    from context_harness.dspy_agent import _detect_character_in_question
+    assert _detect_character_in_question("What would Sirius say about family?") == "sirius-black"
+    assert _detect_character_in_question("sirius black on family rejection") == "sirius-black"
+    assert _detect_character_in_question("Padfoot's view on loyalty") == "sirius-black"
+
+
+def test_detect_character_handles_chip_text_patterns():
+    """The welcome-screen chips use varied phrasings — make sure each
+    pattern produces a slug. Bug repro for the 2026-05-26 incident
+    where 'Luna's take on...' hit the disambiguation flow."""
+    from context_harness.dspy_agent import _detect_character_in_question
+    # "X's take on..." (the bug repro)
+    assert _detect_character_in_question("Luna's take on social anxiety at parties") == "luna-lovegood"
+    # "Ask X how to..."
+    assert _detect_character_in_question("Ask Hermione how to beat burnout in grad school") == "hermione-granger"
+    # "How would X handle..."
+    assert _detect_character_in_question("How would Sirius handle family that doesn't accept me?") == "sirius-black"
+    # "X: <question>"
+    assert _detect_character_in_question("Dumbledore: how do I forgive someone who hurt me badly?") == "albus-dumbledore"
+    # "What would X say..."
+    assert _detect_character_in_question("What would Dumbledore say about my career change?") == "albus-dumbledore"
+
+
 # ---------------------------------------------------------------------------
 # OpenAnalysisModule — character-aware retrieval split
 # ---------------------------------------------------------------------------

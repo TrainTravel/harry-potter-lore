@@ -314,6 +314,9 @@ _CHARACTER_SLUG: Dict[str, str] = {
     "draco malfoy": "draco-malfoy",
     "hagrid":       "rubeus-hagrid",
     "rubeus hagrid": "rubeus-hagrid",
+    "sirius":       "sirius-black",
+    "sirius black": "sirius-black",
+    "padfoot":      "sirius-black",
 }
 
 
