@@ -167,6 +167,24 @@ def test_decide_effective_mode_handles_none_routed_mode_gracefully():
             "perspective_shift", "router",
             id="router_agrees_no_lock_needed",
         ),
+        # Router has no opinion (routed_mode="none") inside an active Luna
+        # chat → lock does NOT fire; falls through to Rule 6 sticky. Same
+        # outcome (perspective_shift) but the source is "sticky" because
+        # we're not overriding any positive route — telemetry stays honest.
+        pytest.param(
+            "none", "high", "luna-lovegood",
+            "perspective_shift", "sticky",
+            id="no_opinion_route_falls_through_to_sticky_not_lock",
+        ),
+        # Whitespace-only character slug must NOT pass the lock. Today's
+        # store layer trims input but the predicate has to be robust
+        # regardless — _is_bound_character() runs the same .strip() check
+        # the carry-forward heuristic uses, so the two can't desync.
+        pytest.param(
+            "open_analysis", "high", "   ",
+            "open_analysis", "router-override",
+            id="whitespace_only_character_does_not_lock",
+        ),
     ],
 )
 def test_character_lock_rule(

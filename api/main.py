@@ -104,6 +104,20 @@ from context_harness.security import PromptGuard, InputValidator, OutputFilter
 _CHAT_MODES = {"open_analysis", "guided_learning", "perspective_shift"}
 
 
+def _is_bound_character(slug: str | None) -> bool:
+    """Whether a character slug is a real, user-bound character.
+
+    Treats whitespace-only and the legacy "Dumbledore" default sentinel
+    as unset — both the character-lock rule (in this module) and the
+    dispatch carry-forward heuristic (api/main.py:~485) need the same
+    predicate, and a shared helper keeps them from desyncing.
+    """
+    if not slug:
+        return False
+    s = slug.strip()
+    return bool(s) and s != "Dumbledore"
+
+
 def _decide_effective_mode(
     routed_mode: str | None,
     router_confidence: str | None,
@@ -145,13 +159,17 @@ def _decide_effective_mode(
         return prior_mode, "router"
 
     # Rule 4: character-lock — active character chat suppresses cross-mode
-    # router overrides. Only applies when the prior turn was a real
-    # character chat: perspective_shift + a bound, non-default character.
-    # Treat the legacy "Dumbledore" default as unset (matches the dispatch
-    # carry-forward heuristic just below).
+    # router overrides. Only applies when:
+    #   - prior turn was a real character chat (perspective_shift + a
+    #     bound character via _is_bound_character)
+    #   - router returned a positive non-perspective_shift route (not
+    #     None and not "none" — those mean "no opinion" and should fall
+    #     through to sticky for cleaner telemetry; a no-opinion route
+    #     reaches prior_mode anyway via Rule 6).
     if (prior_mode == "perspective_shift"
-            and prior_character
-            and prior_character != "Dumbledore"
+            and _is_bound_character(prior_character)
+            and routed_mode is not None
+            and routed_mode != "none"
             and routed_mode != "perspective_shift"):
         return prior_mode, "character-lock"
 
@@ -476,13 +494,12 @@ def ask(req: AskRequest, background: BackgroundTasks) -> AskResponse:
 
         # Inherit prior character on sticky perspective_shift continuation
         # when the current request didn't pin one. Explicit picks are always
-        # respected. Treat the legacy "Dumbledore" default as unset too, so
-        # older clients still benefit from stickiness.
+        # respected. _is_bound_character treats whitespace + the legacy
+        # "Dumbledore" default sentinel as unset (same predicate the
+        # character-lock rule uses, so the two heuristics can't desync).
         if (dispatch_mode == "perspective_shift"
-                and prior_character
-                and (not (dispatch_character or "").strip()
-                     or dispatch_character == "Dumbledore")
-                and prior_character != "Dumbledore"):
+                and _is_bound_character(prior_character)
+                and not _is_bound_character(dispatch_character)):
             dispatch_character = prior_character
 
     # Perspective-shift disambiguation: when the dispatch lands on
